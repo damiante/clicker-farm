@@ -1,0 +1,41 @@
+export const GameConfig = {
+    WORLD: {
+        INITIAL_CHUNK_SIZE: 10,
+        EXPANSION_CHUNK_SIZE: 10,
+        TILE_SIZE: 32,
+        RIVER_MAX_WIDTH: 2,
+        RIVER_MIN_WIDTH: 1,
+        RIVER_FORK_PROBABILITY: 0.08,
+        RIVER_CONVERGENCE_PROBABILITY: 0.02,
+        RIVER_TURN_PROBABILITY: 0.15,
+        RIVER_SOURCES_MIN: 1,
+        RIVER_SOURCES_MAX: 1,
+        RIVER_SEGMENT_LENGTH: 8,
+        RIVER_MEANDER_AMOUNT: 0.3,
+    },
+    ECONOMY: {
+        STARTING_MONEY: 0,
+        CLICK_REWARD: 1,
+        CURRENCY_SYMBOL: '$',
+    },
+    RENDERING: {
+        BACKGROUND_COLOR: '#151216',
+        FPS: 60,
+    },
+    STORAGE: {
+        SAVE_KEY: 'clickerFarmGameState',
+        AUTO_SAVE_INTERVAL: 30000, // 30 seconds
+    },
+    TILES: {
+        GRASS: {
+            id: 'grass',
+            asset: './assets/grass.png',
+            code: 'g'
+        },
+        WATER: {
+            id: 'water',
+            asset: './assets/water.png',
+            code: 'w'
+        },
+    },
+};

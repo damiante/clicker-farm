@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Clicker Farm</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-overlay">
+        <div id="top-left">
+            <div id="money-display"></div>
+            <div id="make-money-container"></div>
+        </div>
+
+        <div id="top-right">
+            <button id="settings-btn" class="icon-btn" aria-label="Settings">☰</button>
+        </div>
+    </div>
+
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>Clicker Farm</h1>
+            <p>Loading assets...</p>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
