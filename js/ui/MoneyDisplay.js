@@ -17,7 +17,7 @@ export class MoneyDisplay {
     }
 
     formatMoney(amount) {
-        return `${GameConfig.ECONOMY.CURRENCY_SYMBOL}${amount.toLocaleString()}`;
+        return `${GameConfig.ECONOMY.CURRENCY_SYMBOL}${amount.toFixed(2)}`;
     }
 
     getMoney() {

@@ -118,10 +118,9 @@ export class InventoryManager {
 
         // Calculate based on how many slots already owned
         const slotsOwned = this.maxSlots - InventoryConfig.INITIAL_SLOTS;
-        return Math.floor(
-            InventoryConfig.SLOT_BASE_PRICE *
-            Math.pow(InventoryConfig.SLOT_PRICE_GROWTH, slotsOwned)
-        );
+        const price = InventoryConfig.SLOT_BASE_PRICE *
+            Math.pow(InventoryConfig.SLOT_PRICE_GROWTH, slotsOwned);
+        return Math.round(price * 100) / 100;  // Round to 2 decimals
     }
 
     getNextStackPrice() {
@@ -132,10 +131,9 @@ export class InventoryManager {
         // Calculate based on how many upgrades already purchased
         const upgradesPurchased = (this.maxStackSize - InventoryConfig.INITIAL_STACK_SIZE) /
                                    InventoryConfig.STACK_SIZE_INCREMENT;
-        return Math.floor(
-            InventoryConfig.STACK_BASE_PRICE *
-            Math.pow(InventoryConfig.STACK_PRICE_GROWTH, upgradesPurchased)
-        );
+        const price = InventoryConfig.STACK_BASE_PRICE *
+            Math.pow(InventoryConfig.STACK_PRICE_GROWTH, upgradesPurchased);
+        return Math.round(price * 100) / 100;  // Round to 2 decimals
     }
 
     expandSlots() {
@@ -151,7 +149,7 @@ export class InventoryManager {
         }
 
         // Deduct money
-        this.game.player.money -= price;
+        this.game.player.money = this.game.roundMoney(this.game.player.money - price);
         this.game.uiManager.updateMoney(this.game.player.money);
 
         // Add slot
@@ -177,7 +175,7 @@ export class InventoryManager {
         }
 
         // Deduct money
-        this.game.player.money -= price;
+        this.game.player.money = this.game.roundMoney(this.game.player.money - price);
         this.game.uiManager.updateMoney(this.game.player.money);
 
         // Increase stack size

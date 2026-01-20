@@ -149,7 +149,7 @@ export class ShopMenu {
         }
 
         // Purchase item
-        this.game.player.money -= item.salePrice;
+        this.game.player.money = this.game.roundMoney(this.game.player.money - item.salePrice);
         this.game.uiManager.updateMoney(this.game.player.money);
 
         // Add to inventory

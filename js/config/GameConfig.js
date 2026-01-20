@@ -15,12 +15,13 @@ export const GameConfig = {
 
         // Expansion pricing (exponential growth)
         // price = base * (growth ^ expansionsCount)
-        EXPANSION_BASE_PRICE: 50,
+        EXPANSION_BASE_PRICE: 0.50,
         EXPANSION_PRICE_GROWTH: 1.3,
     },
     ECONOMY: {
         STARTING_MONEY: 0,
-        CLICK_REWARD: 1,
+        CLICK_REWARD: 0.01,
+        CLICK_CHANCE: 0.5,  // 50% chance to find a penny
         CURRENCY_SYMBOL: '$',
     },
     RENDERING: {

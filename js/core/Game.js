@@ -281,10 +281,15 @@ export class Game {
         });
     }
 
+    roundMoney(amount) {
+        // Round to 2 decimal places (cents precision)
+        return Math.round(amount * 100) / 100;
+    }
+
     getExpansionPrice() {
         const basePrice = GameConfig.WORLD.EXPANSION_BASE_PRICE;
         const growth = GameConfig.WORLD.EXPANSION_PRICE_GROWTH;
-        return Math.floor(basePrice * Math.pow(growth, this.player.expansionCount));
+        return this.roundMoney(basePrice * Math.pow(growth, this.player.expansionCount));
     }
 
     expandWorld(buttonData) {
@@ -299,7 +304,7 @@ export class Game {
         console.log(`Expanding world: ${buttonData.direction} from chunk (${buttonData.chunkX}, ${buttonData.chunkY}) for $${price}`);
 
         // Deduct money
-        this.player.money -= price;
+        this.player.money = this.roundMoney(this.player.money - price);
         this.uiManager.updateMoney(this.player.money);
 
         // Increment expansion count
@@ -317,11 +322,11 @@ export class Game {
     }
 
     addMoney(amount) {
-        this.player.money += amount;
+        this.player.money = this.roundMoney(this.player.money + amount);
 
         // Track peak money for menu unlocks
         if (this.player.money > this.player.peakMoney) {
-            this.player.peakMoney = this.player.money;
+            this.player.peakMoney = this.roundMoney(this.player.money);
             const unlocked = this.menuManager.checkUnlocks();
             // Auto-expand if new menus were unlocked
             this.shopMenu.refresh({ autoExpand: unlocked });

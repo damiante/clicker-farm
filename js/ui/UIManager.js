@@ -17,8 +17,11 @@ export class UIManager {
         this.moneyDisplay = new MoneyDisplay(moneyDisplayElement);
 
         const makeMoneyContainer = document.getElementById('make-money-container');
-        this.makeMoneyButton = new Button('Make money', '💲', () => {
-            this.game.addMoney(GameConfig.ECONOMY.CLICK_REWARD);
+        this.makeMoneyButton = new Button('Search for pennies', '🔍', () => {
+            // 50% chance to find a penny
+            if (Math.random() < GameConfig.ECONOMY.CLICK_CHANCE) {
+                this.game.addMoney(GameConfig.ECONOMY.CLICK_REWARD);
+            }
         }, 'success');
         makeMoneyContainer.appendChild(this.makeMoneyButton.getElement());
 
