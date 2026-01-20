@@ -11,6 +11,14 @@ export const UITheme = {
         BACKGROUND: '#2C3E50',
         BACKGROUND_DARK: '#1A252F',
         MODAL_OVERLAY: 'rgba(0, 0, 0, 0.7)',
+        INVENTORY_BACKGROUND: 'rgba(44, 62, 80, 0.95)',
+        INVENTORY_SLOT_EMPTY: '#555',
+        INVENTORY_SLOT_FILLED: '#4A90E2',
+        MENU_BACKGROUND: 'rgba(44, 62, 80, 0.95)',
+        MENU_HEADER_BG: 'rgba(74, 144, 226, 0.3)',
+        MENU_HEADER_HOVER: 'rgba(74, 144, 226, 0.5)',
+        MENU_ITEM_HOVER: 'rgba(255, 255, 255, 0.1)',
+        PRICE_COLOR: '#2ECC71',
     },
     TYPOGRAPHY: {
         FONT_FAMILY: 'Arial, sans-serif',
@@ -35,5 +43,7 @@ export const UITheme = {
         MIN_TOUCH_TARGET: '44px',
         MODAL_MAX_WIDTH: '500px',
         MODAL_MIN_WIDTH: '300px',
+        INVENTORY_PANEL_WIDTH: '300px',
+        MENU_WIDTH: '250px',
     },
 };

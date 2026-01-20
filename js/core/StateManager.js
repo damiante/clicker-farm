@@ -11,9 +11,8 @@ export class StateManager {
             const stateData = {
                 version: '1.0',
                 timestamp: Date.now(),
-                player: {
-                    money: gameState.player.money
-                },
+                player: gameState.player,
+                settings: gameState.settings,
                 world: gameState.world,
                 entities: gameState.entities || []
             };

@@ -1,5 +1,6 @@
 import { GameConfig } from '../config/GameConfig.js';
 import { WorldGenerator } from './WorldGenerator.js';
+import { Tile } from './Tile.js';
 
 export class ChunkManager {
     constructor(seed) {
@@ -124,6 +125,26 @@ export class ChunkManager {
 
     getAllChunks() {
         return Array.from(this.chunks.values());
+    }
+
+    getTile(tileX, tileY) {
+        const chunkSize = GameConfig.WORLD.INITIAL_CHUNK_SIZE;
+        const chunkX = Math.floor(tileX / chunkSize);
+        const chunkY = Math.floor(tileY / chunkSize);
+        const chunk = this.getChunk(chunkX, chunkY);
+
+        if (!chunk) {
+            return null;
+        }
+
+        const localX = ((tileX % chunkSize) + chunkSize) % chunkSize;
+        const localY = ((tileY % chunkSize) + chunkSize) % chunkSize;
+
+        const tileType = chunk.tiles[localY][localX];
+
+        // Create a Tile object on-the-fly
+        // Note: entity is managed separately via game.entities array
+        return new Tile(tileX, tileY, tileType);
     }
 
     getWorldBounds() {

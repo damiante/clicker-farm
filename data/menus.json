@@ -1,0 +1,8 @@
+[
+  {
+    "id": "plants",
+    "name": "Plants",
+    "emoji": "🌿",
+    "items": ["rose_seed", "tree_seed"]
+  }
+]

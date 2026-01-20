@@ -100,6 +100,29 @@ export class Renderer {
         this.ctx.restore();
     }
 
+    renderEntities(entities, itemRegistry) {
+        this.ctx.save();
+        this.ctx.scale(this.zoom, this.zoom);
+
+        const tileSize = GameConfig.WORLD.TILE_SIZE;
+
+        // Calculate visible bounds for viewport culling
+        const visibleStartX = Math.floor(this.camera.x / tileSize) - 1;
+        const visibleStartY = Math.floor(this.camera.y / tileSize) - 1;
+        const visibleEndX = Math.ceil((this.camera.x + this.canvas.width / this.zoom) / tileSize) + 1;
+        const visibleEndY = Math.ceil((this.camera.y + this.canvas.height / this.zoom) / tileSize) + 1;
+
+        for (const entity of entities) {
+            // Viewport culling - only render visible entities
+            if (entity.x >= visibleStartX && entity.x <= visibleEndX &&
+                entity.y >= visibleStartY && entity.y <= visibleEndY) {
+                entity.render(this.ctx, this.camera.x, this.camera.y, tileSize, itemRegistry);
+            }
+        }
+
+        this.ctx.restore();
+    }
+
     renderTile(tileType, worldX, worldY) {
         const tileSize = GameConfig.WORLD.TILE_SIZE;
         const screenX = Math.floor(worldX * tileSize - this.camera.x);
@@ -225,5 +248,71 @@ export class Renderer {
 
     getCamera() {
         return { ...this.camera };
+    }
+
+    renderGrid(chunkManager) {
+        this.ctx.save();
+        this.ctx.scale(this.zoom, this.zoom);
+
+        const chunks = chunkManager.getAllChunks();
+        const tileSize = GameConfig.WORLD.TILE_SIZE;
+        const chunkSize = GameConfig.WORLD.INITIAL_CHUNK_SIZE;
+
+        const visibleStartX = Math.floor(this.camera.x / tileSize) - 1;
+        const visibleStartY = Math.floor(this.camera.y / tileSize) - 1;
+        const visibleEndX = Math.ceil((this.camera.x + this.canvas.width / this.zoom) / tileSize) + 1;
+        const visibleEndY = Math.ceil((this.camera.y + this.canvas.height / this.zoom) / tileSize) + 1;
+
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        this.ctx.lineWidth = 1 / this.zoom;
+
+        this.ctx.beginPath();
+
+        // Draw vertical lines
+        for (const chunk of chunks) {
+            const chunkWorldX = chunk.x * chunkSize;
+            const chunkWorldY = chunk.y * chunkSize;
+
+            for (let x = 0; x <= chunk.tiles[0].length; x++) {
+                const worldX = chunkWorldX + x;
+
+                if (worldX >= visibleStartX && worldX <= visibleEndX + 1) {
+                    const screenX = Math.floor(worldX * tileSize - this.camera.x);
+                    const startY = Math.max(chunkWorldY, visibleStartY);
+                    const endY = Math.min(chunkWorldY + chunk.tiles.length, visibleEndY + 1);
+
+                    const screenStartY = Math.floor(startY * tileSize - this.camera.y);
+                    const screenEndY = Math.floor(endY * tileSize - this.camera.y);
+
+                    this.ctx.moveTo(screenX, screenStartY);
+                    this.ctx.lineTo(screenX, screenEndY);
+                }
+            }
+        }
+
+        // Draw horizontal lines
+        for (const chunk of chunks) {
+            const chunkWorldX = chunk.x * chunkSize;
+            const chunkWorldY = chunk.y * chunkSize;
+
+            for (let y = 0; y <= chunk.tiles.length; y++) {
+                const worldY = chunkWorldY + y;
+
+                if (worldY >= visibleStartY && worldY <= visibleEndY + 1) {
+                    const screenY = Math.floor(worldY * tileSize - this.camera.y);
+                    const startX = Math.max(chunkWorldX, visibleStartX);
+                    const endX = Math.min(chunkWorldX + chunk.tiles[0].length, visibleEndX + 1);
+
+                    const screenStartX = Math.floor(startX * tileSize - this.camera.x);
+                    const screenEndX = Math.floor(endX * tileSize - this.camera.x);
+
+                    this.ctx.moveTo(screenStartX, screenY);
+                    this.ctx.lineTo(screenEndX, screenY);
+                }
+            }
+        }
+
+        this.ctx.stroke();
+        this.ctx.restore();
     }
 }

@@ -1,0 +1,53 @@
+{
+  "rose_seed": {
+    "id": "rose_seed",
+    "name": "Rose Seed",
+    "emoji": "🫘",
+    "description": "Plant to grow beautiful roses",
+    "salePrice": 15,
+    "itemType": "seed",
+    "growsInto": "rose",
+    "sproutTime": 10,
+    "maturityTime": 20,
+    "overworldScale": 0.4
+  },
+  "rose": {
+    "id": "rose",
+    "name": "Rose",
+    "emoji": "🌹",
+    "description": "A beautiful red rose",
+    "salePrice": 30,
+    "itemType": "plant",
+    "overworldScale": 0.5
+  },
+  "tree_seed": {
+    "id": "tree_seed",
+    "name": "Tree Seed",
+    "emoji": "🌰",
+    "description": "Plant to grow a sturdy tree",
+    "salePrice": 50,
+    "itemType": "seed",
+    "growsInto": "tree",
+    "sproutTime": 30,
+    "maturityTime": 60,
+    "overworldScale": 0.3
+  },
+  "tree": {
+    "id": "tree",
+    "name": "Tree",
+    "emoji": "🌳",
+    "description": "A strong oak tree",
+    "salePrice": 150,
+    "itemType": "plant",
+    "overworldScale": 1.2
+  },
+  "seedling": {
+    "id": "seedling",
+    "name": "Seedling",
+    "emoji": "🌱",
+    "description": "A young sprout",
+    "salePrice": 0,
+    "itemType": "growth_stage",
+    "overworldScale": 0.9
+  }
+}

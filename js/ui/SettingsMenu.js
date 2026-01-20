@@ -2,17 +2,56 @@ import { Modal } from './Modal.js';
 import { Button } from './Button.js';
 
 export class SettingsMenu {
-    constructor(onReset) {
+    constructor(game, onReset) {
+        this.game = game;
         this.onReset = onReset;
         this.currentModal = null;
     }
 
     open() {
+        // Create custom content with checkbox for grid lines
+        const content = document.createElement('div');
+        content.style.marginBottom = '20px';
+
+        // Grid lines toggle
+        const gridContainer = document.createElement('div');
+        gridContainer.style.display = 'flex';
+        gridContainer.style.alignItems = 'center';
+        gridContainer.style.gap = '10px';
+        gridContainer.style.padding = '10px';
+        gridContainer.style.background = 'rgba(255, 255, 255, 0.05)';
+        gridContainer.style.borderRadius = '4px';
+        gridContainer.style.marginBottom = '15px';
+
+        const gridCheckbox = document.createElement('input');
+        gridCheckbox.type = 'checkbox';
+        gridCheckbox.id = 'grid-toggle';
+        gridCheckbox.checked = this.game.settings.showGrid;
+        gridCheckbox.style.cursor = 'pointer';
+        gridCheckbox.style.width = '20px';
+        gridCheckbox.style.height = '20px';
+
+        const gridLabel = document.createElement('label');
+        gridLabel.htmlFor = 'grid-toggle';
+        gridLabel.textContent = 'Show Grid Lines';
+        gridLabel.style.cursor = 'pointer';
+        gridLabel.style.color = 'white';
+        gridLabel.style.fontSize = '16px';
+
+        gridCheckbox.addEventListener('change', (e) => {
+            this.game.settings.showGrid = e.target.checked;
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+        });
+
+        gridContainer.appendChild(gridCheckbox);
+        gridContainer.appendChild(gridLabel);
+        content.appendChild(gridContainer);
+
         const resetButton = new Button('Reset Progress', null, () => {
             this.showResetConfirmation();
         }, 'danger');
 
-        const modal = new Modal('Settings', 'Game settings and options', [resetButton]);
+        const modal = new Modal('Settings', content, [resetButton]);
         modal.onClose = () => {
             this.currentModal = null;
         };
