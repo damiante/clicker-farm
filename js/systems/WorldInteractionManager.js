@@ -185,6 +185,9 @@ export class WorldInteractionManager {
         if (this.inventoryManager.hasRoomFor(harvestedItemId)) {
             this.inventoryManager.addItem(harvestedItemId);
 
+            // Notify about new item (shows pulse if inventory closed)
+            this.game.inventoryPanel.notifyItemAdded();
+
             // Remove plant entity
             this.game.removeEntity(plant);
 

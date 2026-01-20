@@ -3,6 +3,6 @@
     "id": "plants",
     "name": "Plants",
     "emoji": "🌿",
-    "items": ["rose_seed", "tree_seed"]
+    "items": ["sunflower_seed", "tree_seed", "hyacinth_seed", "tulip_seed", "rose_seed"]
   }
 ]

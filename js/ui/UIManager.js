@@ -36,6 +36,9 @@ export class UIManager {
         }, 'primary');
         topRight.insertBefore(inventoryBtn.getElement(), topRight.firstChild);
 
+        // Pass button reference to inventory panel for notifications
+        this.game.inventoryPanel.setInventoryButton(inventoryBtn.getElement());
+
         const settingsBtn = document.getElementById('settings-btn');
         this.settingsMenu = new SettingsMenu(this.game, () => {
             this.game.reset();
@@ -58,6 +61,12 @@ export class UIManager {
 
         const expansionPrice = this.game.getExpansionPrice();
         const canAfford = this.game.player.money >= expansionPrice;
+        const hasEverAfforded = this.game.player.peakMoney >= expansionPrice;
+
+        // Only show buttons if player has ever had enough money
+        if (!hasEverAfforded) {
+            return;
+        }
 
         for (const btnData of buttons) {
             const btn = document.createElement('button');
@@ -73,7 +82,7 @@ export class UIManager {
             label.style.marginBottom = '4px';
 
             const price = document.createElement('div');
-            price.textContent = `$${expansionPrice}`;
+            price.textContent = `$${expansionPrice.toFixed(2)}`;
             price.style.fontSize = '14px';
             price.style.opacity = '0.8';
 

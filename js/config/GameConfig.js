@@ -15,7 +15,7 @@ export const GameConfig = {
 
         // Expansion pricing (exponential growth)
         // price = base * (growth ^ expansionsCount)
-        EXPANSION_BASE_PRICE: 0.50,
+        EXPANSION_BASE_PRICE: 10000,
         EXPANSION_PRICE_GROWTH: 1.3,
     },
     ECONOMY: {

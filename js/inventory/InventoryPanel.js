@@ -13,6 +13,7 @@ export class InventoryPanel {
         this.visible = false;
         this.selectedSlotIndex = null; // Currently selected slot for placement
         this.previewPanel = new ItemPreviewPanel(itemRegistry);
+        this.inventoryButton = null; // Reference to inventory button for notifications
 
         this.createPanel();
     }
@@ -232,6 +233,7 @@ export class InventoryPanel {
         this.panel.classList.remove('hidden');
         this.panel.classList.add('visible');
         this.visible = true;
+        this.clearNotification();
         this.refresh();
     }
 
@@ -248,5 +250,31 @@ export class InventoryPanel {
 
     getElement() {
         return this.panel;
+    }
+
+    setInventoryButton(button) {
+        this.inventoryButton = button;
+    }
+
+    notifyItemAdded() {
+        // Only notify if inventory is currently closed
+        if (!this.visible && this.inventoryButton) {
+            this.game.player.inventoryNotification = true;
+            this.inventoryButton.classList.add('has-notification');
+        }
+    }
+
+    clearNotification() {
+        if (this.game.player.inventoryNotification && this.inventoryButton) {
+            this.game.player.inventoryNotification = false;
+            this.inventoryButton.classList.remove('has-notification');
+        }
+    }
+
+    restoreNotification() {
+        // Called when loading from saved state to restore notification visual
+        if (this.inventoryButton) {
+            this.inventoryButton.classList.add('has-notification');
+        }
     }
 }

@@ -41,7 +41,9 @@ export class Game {
             inventorySlotsPrice: InventoryConfig.SLOT_BASE_PRICE,
             stackSizePrice: InventoryConfig.STACK_BASE_PRICE,
             unlockedMenus: [],
-            expansionCount: 0  // Track number of world expansions
+            unlockedItems: [],
+            expansionCount: 0,  // Track number of world expansions
+            inventoryNotification: false  // Track unviewed inventory changes
         };
 
         this.settings = {
@@ -138,12 +140,19 @@ export class Game {
         this.player.maxInventorySlots = InventoryConfig.INITIAL_SLOTS;
         this.player.maxStackSize = InventoryConfig.INITIAL_STACK_SIZE;
         this.player.unlockedMenus = [];
+        this.player.unlockedItems = [];
         this.player.expansionCount = 0;
+        this.player.inventoryNotification = false;
 
         // Initialize inventory
         this.inventoryManager.deserialize(this.player);
 
         this.uiManager.updateMoney(this.player.money);
+
+        // Check for menu and item unlocks
+        this.menuManager.checkUnlocks();
+        this.menuManager.checkItemUnlocks();
+        this.shopMenu.refresh({ autoExpand: true });
 
         console.log('New game started with seed:', seed);
     }
@@ -156,7 +165,9 @@ export class Game {
         this.player.money = state.player.money;
         this.player.peakMoney = state.player.peakMoney || state.player.money;
         this.player.unlockedMenus = state.player.unlockedMenus || [];
+        this.player.unlockedItems = state.player.unlockedItems || [];
         this.player.expansionCount = state.player.expansionCount || 0;
+        this.player.inventoryNotification = state.player.inventoryNotification || false;
 
         // Restore settings
         if (state.settings) {
@@ -166,6 +177,15 @@ export class Game {
         // Restore inventory
         this.inventoryManager.deserialize(state.player);
         this.inventoryPanel.refresh();
+
+        // Restore inventory notification state
+        if (this.player.inventoryNotification) {
+            this.inventoryPanel.restoreNotification();
+        }
+
+        // Check for menu and item unlocks based on loaded peakMoney
+        this.menuManager.checkUnlocks();
+        this.menuManager.checkItemUnlocks();
 
         // Restore menus
         this.shopMenu.refresh({ autoExpand: true });
@@ -219,7 +239,9 @@ export class Game {
                 slotPrice: inventoryState.slotPrice,
                 stackPrice: inventoryState.stackPrice,
                 unlockedMenus: this.player.unlockedMenus,
-                expansionCount: this.player.expansionCount
+                unlockedItems: this.player.unlockedItems,
+                expansionCount: this.player.expansionCount,
+                inventoryNotification: this.player.inventoryNotification
             },
             settings: this.settings,
             world: this.chunkManager.serialize(),
@@ -324,12 +346,15 @@ export class Game {
     addMoney(amount) {
         this.player.money = this.roundMoney(this.player.money + amount);
 
-        // Track peak money for menu unlocks
+        // Track peak money for menu and item unlocks
         if (this.player.money > this.player.peakMoney) {
             this.player.peakMoney = this.roundMoney(this.player.money);
-            const unlocked = this.menuManager.checkUnlocks();
-            // Auto-expand if new menus were unlocked
-            this.shopMenu.refresh({ autoExpand: unlocked });
+            const menusUnlocked = this.menuManager.checkUnlocks();
+            const itemsUnlocked = this.menuManager.checkItemUnlocks();
+            // Auto-expand if new menus were unlocked, refresh if new items unlocked
+            if (menusUnlocked || itemsUnlocked) {
+                this.shopMenu.refresh({ autoExpand: menusUnlocked });
+            }
         }
 
         this.uiManager.updateMoney(this.player.money);

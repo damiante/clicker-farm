@@ -1,14 +1,77 @@
 {
+  "sunflower_seed": {
+    "id": "sunflower_seed",
+    "name": "Sunflower Seed",
+    "emoji": "🫘",
+    "description": "Plant to grow a sunflower",
+    "salePrice": 0.25,
+    "itemType": "seed",
+    "growsInto": "sunflower",
+    "sproutTime": 10,
+    "maturityTime": 20,
+    "overworldScale": 0.4
+  },
+  "sunflower": {
+    "id": "sunflower",
+    "name": "Sunflower",
+    "emoji": "🌻",
+    "description": "A bright yellow sunflower",
+    "salePrice": 0.50,
+    "itemType": "plant",
+    "overworldScale": 0.5
+  },
+  "hyacinth_seed": {
+    "id": "hyacinth_seed",
+    "name": "Hyacinth Seed",
+    "emoji": "🫘",
+    "description": "Plant to grow a hyacinth",
+    "salePrice": 2.00,
+    "itemType": "seed",
+    "growsInto": "hyacinth",
+    "sproutTime": 60,
+    "maturityTime": 120,
+    "overworldScale": 0.4
+  },
+  "hyacinth": {
+    "id": "hyacinth",
+    "name": "Hyacinth",
+    "emoji": "🪻",
+    "description": "A beautiful purple hyacinth",
+    "salePrice": 4.00,
+    "itemType": "plant",
+    "overworldScale": 0.5
+  },
+  "tulip_seed": {
+    "id": "tulip_seed",
+    "name": "Tulip Seed",
+    "emoji": "🫘",
+    "description": "Plant to grow a tulip",
+    "salePrice": 20.00,
+    "itemType": "seed",
+    "growsInto": "tulip",
+    "sproutTime": 120,
+    "maturityTime": 240,
+    "overworldScale": 0.4
+  },
+  "tulip": {
+    "id": "tulip",
+    "name": "Tulip",
+    "emoji": "🌷",
+    "description": "A vibrant red tulip",
+    "salePrice": 40.00,
+    "itemType": "plant",
+    "overworldScale": 0.5
+  },
   "rose_seed": {
     "id": "rose_seed",
     "name": "Rose Seed",
     "emoji": "🫘",
     "description": "Plant to grow beautiful roses",
-    "salePrice": 0.15,
+    "salePrice": 100.00,
     "itemType": "seed",
     "growsInto": "rose",
-    "sproutTime": 10,
-    "maturityTime": 20,
+    "sproutTime": 300,
+    "maturityTime": 600,
     "overworldScale": 0.4
   },
   "rose": {
@@ -16,7 +79,7 @@
     "name": "Rose",
     "emoji": "🌹",
     "description": "A beautiful red rose",
-    "salePrice": 0.30,
+    "salePrice": 250.00,
     "itemType": "plant",
     "overworldScale": 0.5
   },

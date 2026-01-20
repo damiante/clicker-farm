@@ -60,6 +60,47 @@ export class MenuManager {
         return unlocked;
     }
 
+    checkItemUnlocks() {
+        let unlocked = false;
+
+        for (const menu of this.menus) {
+            // Only check items in unlocked menus
+            if (!this.isMenuUnlocked(menu.id)) {
+                continue;
+            }
+
+            // Get items sorted by price
+            const sortedItems = menu.items
+                .map(itemId => this.itemRegistry.getItem(itemId))
+                .filter(item => item !== null && item !== undefined)
+                .sort((a, b) => a.salePrice - b.salePrice);
+
+            for (const item of sortedItems) {
+                if (!this.isItemUnlocked(item.id)) {
+                    // Unlock if player has ever reached this price
+                    if (this.game.player.peakMoney >= item.salePrice) {
+                        this.game.player.unlockedItems.push(item.id);
+                        unlocked = true;
+                        console.log(`Unlocked item: ${item.name} ($${item.salePrice})`);
+                    }
+                }
+            }
+        }
+
+        return unlocked;
+    }
+
+    isItemUnlocked(itemId) {
+        return this.game.player.unlockedItems.includes(itemId);
+    }
+
+    getUnlockedItemsForMenu(menuId) {
+        const menu = this.getMenu(menuId);
+        if (!menu) return [];
+
+        return menu.items.filter(itemId => this.isItemUnlocked(itemId));
+    }
+
     getMenu(menuId) {
         return this.menus.find(menu => menu.id === menuId);
     }

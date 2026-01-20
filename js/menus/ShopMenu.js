@@ -82,7 +82,9 @@ export class ShopMenu {
         const itemsContainer = document.createElement('div');
         itemsContainer.className = 'menu-items';
 
-        for (const itemId of menu.items) {
+        // Only show unlocked items
+        const unlockedItems = this.menuManager.getUnlockedItemsForMenu(menu.id);
+        for (const itemId of unlockedItems) {
             const item = this.itemRegistry.getItem(itemId);
             if (item) {
                 const itemElement = this.createItemElement(item);
@@ -154,6 +156,9 @@ export class ShopMenu {
 
         // Add to inventory
         if (this.inventoryManager.addItem(item.id)) {
+            // Notify about new item (shows pulse if inventory closed)
+            this.game.inventoryPanel.notifyItemAdded();
+
             // Refresh inventory panel if visible
             if (this.game.inventoryPanel.isVisible()) {
                 this.game.inventoryPanel.refresh();
