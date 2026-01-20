@@ -12,6 +12,11 @@ export const GameConfig = {
         RIVER_SOURCES_MAX: 1,
         RIVER_SEGMENT_LENGTH: 8,
         RIVER_MEANDER_AMOUNT: 0.3,
+
+        // Expansion pricing (exponential growth)
+        // price = base * (growth ^ expansionsCount)
+        EXPANSION_BASE_PRICE: 50,
+        EXPANSION_PRICE_GROWTH: 1.3,
     },
     ECONOMY: {
         STARTING_MONEY: 0,
@@ -21,6 +26,11 @@ export const GameConfig = {
     RENDERING: {
         BACKGROUND_COLOR: '#151216',
         FPS: 60,
+    },
+    ENTITIES: {
+        RENDER_EMOJI_FONT_SIZE: 32,
+        DEFAULT_OVERWORLD_SCALE: 1.0,  // Default scale for items without overworldScale property
+        PLACEMENT_PREVIEW_OPACITY: 0.4,  // Opacity for placement preview (0-1)
     },
     STORAGE: {
         SAVE_KEY: 'clickerFarmGameState',

@@ -17,6 +17,7 @@ export class InputManager {
         this.dragStartY = 0;
         this.lastDragX = 0;
         this.lastDragY = 0;
+        this.dragSource = 'canvas';  // 'canvas' or 'inventory'
 
         this.setupEventListeners();
     }
@@ -40,6 +41,10 @@ export class InputManager {
         const position = this.getPointerPosition(event);
 
         if (type === 'pointerdown') {
+            // Detect if drag started on inventory slot
+            const target = event.target;
+            this.dragSource = target.closest('.inventory-slot') ? 'inventory' : 'canvas';
+
             this.isDragging = true;
             this.dragStartX = position.x;
             this.dragStartY = position.y;
@@ -52,16 +57,20 @@ export class InputManager {
             this.lastDragX = position.x;
             this.lastDragY = position.y;
 
-            for (const listener of this.listeners.pan) {
-                listener({
-                    type: 'drag',
-                    deltaX,
-                    deltaY,
-                    position
-                });
+            // Only pan camera if drag started on canvas (not inventory)
+            if (this.dragSource === 'canvas') {
+                for (const listener of this.listeners.pan) {
+                    listener({
+                        type: 'drag',
+                        deltaX,
+                        deltaY,
+                        position
+                    });
+                }
             }
         } else if (type === 'pointerup') {
             this.isDragging = false;
+            this.dragSource = 'canvas';
         }
 
         for (const listener of this.listeners[type]) {

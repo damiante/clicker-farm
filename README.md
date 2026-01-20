@@ -1,16 +1,38 @@
 # Clicker Farm
 
-A browser-based clicker/farming game hybrid with procedural world generation. Players accumulate resources through clicking and explore an ever-expanding tile-based world with natural river formations.
+A browser-based farming game with procedural world generation, inventory management, and plant growth mechanics. Plant seeds, watch them grow, harvest crops, and expand your world.
 
 ## Features
 
+### World & Exploration
 - **Procedural World Generation**: Natural-looking rivers that flow through grass terrain
-- **Expandable World**: Click expansion buttons to grow your world chunk-by-chunk (10x10 tiles per chunk)
-- **Camera Controls**: Zoom and pan to explore your world
-- **Clicker Mechanics**: Earn money by clicking the "Make money" button
-- **Persistent Progress**: Your game state is automatically saved to browser storage
-- **Mobile & Desktop Support**: Touch-friendly UI that works on all devices with full zoom/pan support
-- **Settings Menu**: Reset your progress and start a new procedurally generated world
+- **Expandable World**: Purchase world expansions to grow your map chunk-by-chunk (10x10 tiles per chunk)
+- **Camera Controls**: Zoom and pan to explore your world with smooth controls
+- **Grid Lines**: Optional toggle to see tile boundaries (Settings → Show Grid Lines)
+
+### Inventory & Items
+- **Inventory System**: Expandable inventory with configurable stack sizes
+- **Shop System**: Buy seeds and items from unlockable shop menus
+- **Item Preview**: See item details and sell items directly from inventory
+- **Drag & Drop**: Place items from inventory onto the world
+
+### Farming Mechanics
+- **Plant Growth**: Seeds grow over time through multiple stages (seed → seedling → mature)
+- **Timestamp-Based**: Plants grow even when the game is closed
+- **Harvesting**: Click mature plants to harvest and add to inventory
+- **Placement Preview**: See translucent preview of where items will be placed
+
+### Progression
+- **Economy System**: Earn money by clicking and selling harvested plants
+- **Unlockable Menus**: Shop menus unlock as you reach money thresholds
+- **Expandable Inventory**: Purchase additional inventory slots and increase stack sizes
+- **Escalating Costs**: Expansion costs increase exponentially
+
+### Quality of Life
+- **Persistent Progress**: Auto-save every 30 seconds to browser storage
+- **Mobile & Desktop Support**: Touch-friendly UI with full zoom/pan support
+- **Selection Persistence**: Place multiple items without reselecting
+- **Plant Info Panels**: Floating panels show plant status without blocking the world
 
 ## How to Play
 
@@ -31,13 +53,14 @@ A browser-based clicker/farming game hybrid with procedural world generation. Pl
    - Then navigate to `http://localhost:8000` in your browser
 
 3. **Start playing!**
-   - Click the "💲 Make money" button to earn $1 per click
-   - Use mouse wheel or pinch to zoom in and out
-   - Drag to pan around the world
-   - Click expansion buttons (⬆⬇⬅➡) at chunk edges to grow your world
-   - Each expansion adds a 10x10 tile chunk in that direction
-   - Your progress is automatically saved every 30 seconds
-   - Explore the procedurally generated world with rivers
+   - Click "💲 Make money" to earn your first dollar
+   - Buy rose seeds from the Plants menu (unlocks at $15)
+   - Open inventory (🎒) and click a seed to select it
+   - Click on grass tiles to plant seeds
+   - Wait for plants to grow (or keep playing!)
+   - Click mature plants to harvest them
+   - Sell harvested plants from inventory for profit
+   - Expand your world and buy more inventory slots as you progress
 
 ### GitHub Pages Deployment
 
@@ -54,21 +77,46 @@ A browser-based clicker/farming game hybrid with procedural world generation. Pl
 ## Game Controls
 
 ### Desktop
-- **Mouse Click**: Interact with buttons and UI elements
+- **Mouse Click**: Interact with buttons, place items, harvest plants
 - **Mouse Wheel**: Zoom in and out on the world
 - **Mouse Drag**: Pan/move the camera around the world
+- **Inventory Button (🎒)**: Open/close inventory panel
 - **Settings Button (☰)**: Open settings menu
-- **Expansion Buttons (⬆⬇⬅➡)**: Expand the world by adding new 10x10 tile chunks
 
 ### Mobile
-- **Tap**: Interact with buttons and UI elements
+- **Tap**: Interact with buttons, place items, harvest plants
 - **Pinch**: Zoom in and out on the world
 - **Drag**: Pan/move the camera around the world
 - Touch controls are fully supported
 
+## Gameplay Loop
+
+1. **Earn Money**: Click the "Make Money" button ($1 per click)
+2. **Buy Seeds**: Purchase seeds from the Plants shop menu
+3. **Plant & Grow**: Select seeds from inventory and plant them on grass tiles
+4. **Harvest**: Click mature plants to collect them
+5. **Sell**: Sell harvested plants from inventory for profit
+6. **Expand**: Buy more inventory slots, stack size upgrades, and world expansions
+7. **Repeat**: Plant more expensive crops (like trees) for higher returns
+
+## Items
+
+### Rose Seeds 🫘
+- **Cost**: $15
+- **Grows Into**: Rose 🌹
+- **Growth Time**: 10s sprout + 20s maturity
+- **Harvest Value**: $30
+
+### Tree Seeds 🌰
+- **Cost**: $50
+- **Grows Into**: Tree 🌳
+- **Growth Time**: 30s sprout + 60s maturity
+- **Harvest Value**: $150
+
 ## Settings
 
 Click the hamburger menu (☰) in the top-right to access:
+- **Show Grid Lines**: Toggle tile boundary visualization
 - **Reset Progress**: Clears all saved data and generates a new world
 
 ## Technical Details
@@ -77,7 +125,8 @@ Click the hamburger menu (☰) in the top-right to access:
 - **Browser Storage**: Uses LocalStorage to persist game state
 - **Auto-Save**: Game automatically saves every 30 seconds
 - **Responsive Design**: Adapts to any screen size
-- **Tile-Based Rendering**: Efficient canvas rendering with viewport culling
+- **Efficient Rendering**: Viewport culling for tiles and entities
+- **Data-Driven**: Items and menus configured via JSON files
 
 ## Browser Requirements
 
@@ -97,24 +146,31 @@ Recommended browsers:
 clicker-farm/
 ├── index.html              # Entry point
 ├── styles/
-│   └── main.css           # Styling
+│   └── main.css            # Styling
 ├── js/
-│   ├── config/            # Configuration files
-│   ├── core/              # Core game systems
-│   ├── world/             # World generation
-│   ├── rendering/         # Canvas rendering
-│   ├── ui/                # UI components
-│   ├── entities/          # Game entities
-│   └── main.js            # Game initialization
+│   ├── config/             # Game configuration (GameConfig.js, UITheme.js, InventoryConfig.js)
+│   ├── core/               # Core systems (Game.js, StateManager.js, InputManager.js)
+│   ├── world/              # World generation (WorldGenerator.js, ChunkManager.js)
+│   ├── rendering/          # Canvas rendering (Renderer.js, AssetLoader.js)
+│   ├── ui/                 # UI components (Modal.js, Button.js, UIManager.js, SettingsMenu.js)
+│   ├── entities/           # Game entities (Entity.js, Plant.js)
+│   ├── inventory/          # Inventory system (InventoryManager.js, InventoryPanel.js)
+│   ├── items/              # Item registry (ItemRegistry.js)
+│   ├── menus/              # Shop system (MenuManager.js, ShopMenu.js)
+│   ├── systems/            # Game systems (WorldInteractionManager.js, PlantInfoPanel.js)
+│   └── main.js             # Game initialization
+├── data/
+│   ├── items.json          # Item definitions
+│   └── menus.json          # Shop menu structure
 ├── assets/
-│   ├── grass.png          # Grass tile texture
-│   └── water.png          # Water tile texture
+│   ├── grass.png           # Grass tile texture
+│   └── water.png           # Water tile texture
 └── README.md
 ```
 
 ## Development
 
-See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation and development guidelines.
+See [CLAUDE.md](CLAUDE.md) for architecture overview and development guidelines.
 
 ## License
 

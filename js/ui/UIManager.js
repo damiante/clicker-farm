@@ -22,8 +22,19 @@ export class UIManager {
         }, 'success');
         makeMoneyContainer.appendChild(this.makeMoneyButton.getElement());
 
+        // Add shop menus to top-left
+        const topLeft = document.getElementById('top-left');
+        topLeft.appendChild(this.game.shopMenu.getElement());
+
+        // Add inventory button to top-right (before settings button)
+        const topRight = document.getElementById('top-right');
+        const inventoryBtn = new Button('Inventory', '🎒', () => {
+            this.game.inventoryPanel.show();
+        }, 'primary');
+        topRight.insertBefore(inventoryBtn.getElement(), topRight.firstChild);
+
         const settingsBtn = document.getElementById('settings-btn');
-        this.settingsMenu = new SettingsMenu(() => {
+        this.settingsMenu = new SettingsMenu(this.game, () => {
             this.game.reset();
         });
 
@@ -42,17 +53,40 @@ export class UIManager {
     updateExpansionButtons(buttons, onExpand) {
         this.clearExpansionButtons();
 
+        const expansionPrice = this.game.getExpansionPrice();
+        const canAfford = this.game.player.money >= expansionPrice;
+
         for (const btnData of buttons) {
             const btn = document.createElement('button');
-            btn.textContent = btnData.label;
             btn.className = 'expansion-btn';
             btn.style.left = `${btnData.x}px`;
             btn.style.top = `${btnData.y}px`;
             btn.style.transform = 'translate(-50%, -50%)';
 
+            // Create button content with price
+            const label = document.createElement('div');
+            label.textContent = btnData.label;
+            label.style.fontSize = '20px';
+            label.style.marginBottom = '4px';
+
+            const price = document.createElement('div');
+            price.textContent = `$${expansionPrice}`;
+            price.style.fontSize = '14px';
+            price.style.opacity = '0.8';
+
+            btn.appendChild(label);
+            btn.appendChild(price);
+
+            // Disable if can't afford
+            if (!canAfford) {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+            }
+
             btn.addEventListener('pointerdown', (e) => {
                 e.preventDefault();
-                if (onExpand) {
+                if (canAfford && onExpand) {
                     onExpand(btnData);
                 }
             });
