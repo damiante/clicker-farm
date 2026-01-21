@@ -5,8 +5,9 @@ export class Barrel extends Entity {
     constructor(x, y, itemId) {
         super(x, y, 'barrel');
         this.itemId = itemId;
-        this.inputSlot = null;  // {itemId, count} or null
-        this.outputSlot = null; // {itemId, count} or null
+        this.inputSlot = null;  // {itemId, count} - Queued items (can be retrieved)
+        this.activeItem = null; // {itemId} - Currently fermenting (always 1 item)
+        this.outputSlot = null; // {itemId, count} - Fermented items
         this.fermentationStartTime = null;  // Timestamp when fermentation started
         this.fermentationTime = null;  // Time in seconds for current recipe
         this.maxStackSize = 5;  // Default, updated when items are placed
@@ -14,18 +15,23 @@ export class Barrel extends Entity {
 
     update(deltaTime) {
         // Check if fermentation should complete
-        if (this.inputSlot && this.fermentationStartTime) {
+        if (this.activeItem && this.fermentationStartTime) {
             const progress = this.getFermentationProgress();
 
-            // If fermentation is complete, try to produce item (completeFermentation handles stack checking)
+            // If fermentation is complete, try to produce item
             if (progress >= 1.0) {
                 this.completeFermentation();
             }
         }
+
+        // If no active fermentation but have queued items, start next fermentation
+        if (!this.activeItem && this.inputSlot) {
+            this.startNextFermentation();
+        }
     }
 
     getFermentationProgress() {
-        if (!this.inputSlot || !this.fermentationStartTime || !this.fermentationTime) {
+        if (!this.activeItem || !this.fermentationStartTime || !this.fermentationTime) {
             return 0;
         }
 
@@ -34,26 +40,36 @@ export class Barrel extends Entity {
         return Math.min(progress, 1.0);
     }
 
-    startFermentation() {
-        if (this.inputSlot) {
-            // Get recipe to determine fermentation time
-            const recipe = GameConfig.FERMENTATION.RECIPES[this.inputSlot.itemId];
-            if (recipe) {
-                this.fermentationTime = recipe.time;
-                this.fermentationStartTime = Date.now();
-            }
+    startNextFermentation() {
+        // Take one item from queue and start fermenting it
+        if (!this.inputSlot || this.inputSlot.count === 0) {
+            return;
+        }
+
+        // Move one item from queue to active
+        this.activeItem = { itemId: this.inputSlot.itemId };
+        this.inputSlot.count--;
+        if (this.inputSlot.count === 0) {
+            this.inputSlot = null;
+        }
+
+        // Get recipe to determine fermentation time
+        const recipe = GameConfig.FERMENTATION.RECIPES[this.activeItem.itemId];
+        if (recipe) {
+            this.fermentationTime = recipe.time;
+            this.fermentationStartTime = Date.now();
         }
     }
 
     completeFermentation() {
-        if (!this.inputSlot) {
-            return; // Can't complete if no input
+        if (!this.activeItem) {
+            return; // Can't complete if nothing is fermenting
         }
 
         // Get the output item based on recipe
-        const recipe = GameConfig.FERMENTATION.RECIPES[this.inputSlot.itemId];
+        const recipe = GameConfig.FERMENTATION.RECIPES[this.activeItem.itemId];
         if (!recipe) {
-            console.warn(`No fermentation recipe for ${this.inputSlot.itemId}`);
+            console.warn(`No fermentation recipe for ${this.activeItem.itemId}`);
             return;
         }
 
@@ -67,25 +83,21 @@ export class Barrel extends Entity {
             // Same item and room in stack
             this.outputSlot.count++;
         } else {
-            // Different item or full stack - can't complete
+            // Different item or full stack - can't complete, keep fermenting
             return;
         }
 
-        // Decrease input count
-        this.inputSlot.count--;
-        if (this.inputSlot.count <= 0) {
-            this.inputSlot = null;
-            this.fermentationStartTime = null;
-            this.fermentationTime = null;
-        } else {
-            // Restart fermentation for next item
-            this.fermentationStartTime = Date.now();
-        }
+        // Clear active item (fermentation complete)
+        this.activeItem = null;
+        this.fermentationStartTime = null;
+        this.fermentationTime = null;
+
+        // Next fermentation will be started by update() if items are queued
     }
 
     canPickup() {
         // Can't pickup if barrel has items or is fermenting
-        return !this.inputSlot && !this.outputSlot;
+        return !this.inputSlot && !this.activeItem && !this.outputSlot;
     }
 
     placeInInput(itemId, count, maxStackSize) {
@@ -93,24 +105,44 @@ export class Barrel extends Entity {
         this.maxStackSize = maxStackSize;
 
         if (!this.inputSlot) {
-            // Empty slot, place item
-            this.inputSlot = { itemId, count: Math.min(count, maxStackSize) };
-            this.startFermentation();
-            return null; // No item to return
+            // Empty slot, place items (only up to max)
+            const placed = Math.min(count, maxStackSize);
+            this.inputSlot = { itemId, count: placed };
+            // Fermentation will be started automatically by update() if no active item
+            const remaining = count - placed;
+            return remaining > 0 ? { overflow: { itemId, count: remaining } } : null;
         } else if (this.inputSlot.itemId === itemId) {
             // Same item, try to add to stack
             const spaceLeft = maxStackSize - this.inputSlot.count;
             const toAdd = Math.min(count, spaceLeft);
             this.inputSlot.count += toAdd;
             const remaining = count - toAdd;
-            return remaining > 0 ? { itemId, count: remaining } : null;
+            return remaining > 0 ? { overflow: { itemId, count: remaining } } : null;
         } else {
             // Different item, swap
             const swapped = { itemId: this.inputSlot.itemId, count: this.inputSlot.count };
-            this.inputSlot = { itemId, count: Math.min(count, maxStackSize) };
-            this.startFermentation();
-            return swapped;
+            const placed = Math.min(count, maxStackSize);
+            this.inputSlot = { itemId, count: placed };
+
+            // Return object with both swapped items and any overflow
+            const overflow = count - placed;
+            const result = { swapped };
+            if (overflow > 0) {
+                result.overflow = { itemId, count: overflow };
+            }
+            return result;
         }
+    }
+
+    takeFromInput() {
+        // Take all queued items from input slot (doesn't affect active fermentation)
+        if (!this.inputSlot) {
+            return null;
+        }
+
+        const taken = { ...this.inputSlot };
+        this.inputSlot = null;
+        return taken;
     }
 
     takeFromOutput() {
@@ -124,7 +156,7 @@ export class Barrel extends Entity {
     }
 
     isFermenting() {
-        return this.inputSlot !== null && this.fermentationStartTime !== null;
+        return this.activeItem !== null && this.fermentationStartTime !== null;
     }
 
     getOverlayIcons() {
@@ -184,6 +216,7 @@ export class Barrel extends Entity {
             ...super.serialize(),
             itemId: this.itemId,
             inputSlot: this.inputSlot,
+            activeItem: this.activeItem,
             outputSlot: this.outputSlot,
             fermentationStartTime: this.fermentationStartTime,
             fermentationTime: this.fermentationTime,
@@ -194,6 +227,7 @@ export class Barrel extends Entity {
     static deserialize(data) {
         const barrel = new Barrel(data.x, data.y, data.itemId);
         barrel.inputSlot = data.inputSlot || null;
+        barrel.activeItem = data.activeItem || null;
         barrel.outputSlot = data.outputSlot || null;
         barrel.fermentationStartTime = data.fermentationStartTime || null;
         barrel.fermentationTime = data.fermentationTime || null;

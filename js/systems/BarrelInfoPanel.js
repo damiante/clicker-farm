@@ -9,6 +9,7 @@ export class BarrelInfoPanel {
         this.currentBarrel = null;
         this.onPickupCallback = null;
         this.onInputClickCallback = null;
+        this.onInputTakeCallback = null;
         this.onOutputClickCallback = null;
         this.refreshInterval = null;
         this.itemDropdown = null;
@@ -19,6 +20,8 @@ export class BarrelInfoPanel {
         this.outputSlotElement = null;
         this.arrowElement = null;
         this.pickupButtonElement = null;
+        this.takeInputButtonElement = null;
+        this.buttonContainerElement = null;
         this.createPanel();
     }
 
@@ -50,10 +53,11 @@ export class BarrelInfoPanel {
         });
     }
 
-    show(barrel, screenX, screenY, onPickup, onInputClick, onOutputClick) {
+    show(barrel, screenX, screenY, onPickup, onInputClick, onInputTake, onOutputClick) {
         this.currentBarrel = barrel;
         this.onPickupCallback = onPickup;
         this.onInputClickCallback = onInputClick;
+        this.onInputTakeCallback = onInputTake;
         this.onOutputClickCallback = onOutputClick;
 
         const item = this.itemRegistry.getItem(barrel.itemId);
@@ -154,10 +158,18 @@ export class BarrelInfoPanel {
 
         this.panel.appendChild(slotsContainer);
 
-        // Add pickup button
-        const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'plant-info-buttons';
+        // Add buttons
+        this.buttonContainerElement = document.createElement('div');
+        this.buttonContainerElement.className = 'plant-info-buttons';
 
+        // Create Take from Input button (always create it, visibility handled in refresh)
+        this.takeInputButtonElement = new Button('Take from Input', '🫴', () => {
+            if (this.onInputTakeCallback && this.currentBarrel) {
+                this.onInputTakeCallback(this.currentBarrel);
+            }
+        }, 'primary');
+
+        // Create Pickup button
         const canPickup = barrel.canPickup();
         const buttonText = canPickup ? 'Pick up' : 'Fermenting...';
         this.pickupButtonElement = new Button(buttonText, '🖐️', () => {
@@ -172,8 +184,24 @@ export class BarrelInfoPanel {
             this.pickupButtonElement.getElement().style.cursor = 'not-allowed';
         }
 
-        buttonContainer.appendChild(this.pickupButtonElement.getElement());
-        this.panel.appendChild(buttonContainer);
+        // Add buttons based on current state
+        this.updateButtons();
+        this.panel.appendChild(this.buttonContainerElement);
+    }
+
+    updateButtons() {
+        if (!this.buttonContainerElement || !this.currentBarrel) return;
+
+        // Clear button container
+        this.buttonContainerElement.innerHTML = '';
+
+        // Add Take from Input button if items in input slot
+        if (this.currentBarrel.inputSlot && this.currentBarrel.inputSlot.count > 0) {
+            this.buttonContainerElement.appendChild(this.takeInputButtonElement.getElement());
+        }
+
+        // Always add pickup button
+        this.buttonContainerElement.appendChild(this.pickupButtonElement.getElement());
     }
 
     refresh() {
@@ -212,6 +240,9 @@ export class BarrelInfoPanel {
                 this.pickupButtonElement.setEnabled(false);
             }
         }
+
+        // Update button visibility
+        this.updateButtons();
     }
 
     updateSlotContents(slotElement, slotData, isOutput) {
@@ -257,12 +288,12 @@ export class BarrelInfoPanel {
 
     createSlot(slotData, isOutput = false) {
         const slot = document.createElement('div');
-        const opacity = isOutput ? '0.6' : '0.8';
+        const opacity = isOutput ? '0.2' : '0.3';
         slot.style.cssText = `
             width: 50px;
             height: 50px;
-            background: rgba(52, 73, 94, ${opacity});
-            border: 2px solid #34495e;
+            background: rgba(0, 0, 0, ${opacity});
+            border: 2px solid #555;
             border-radius: 4px;
             display: flex;
             align-items: center;

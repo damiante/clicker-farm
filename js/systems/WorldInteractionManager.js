@@ -201,6 +201,7 @@ export class WorldInteractionManager {
             screenPos.y,
             (pickedUpBarrel) => this.pickupBarrel(pickedUpBarrel),
             (clickedBarrel) => this.onBarrelInputSlotClick(clickedBarrel),
+            (clickedBarrel) => this.onBarrelInputTakeClick(clickedBarrel),
             (clickedBarrel) => this.onBarrelOutputSlotClick(clickedBarrel)
         );
     }
@@ -221,25 +222,88 @@ export class WorldInteractionManager {
         this.placeItemInBarrel(barrel, selectedItem.itemId);
     }
 
-    placeItemInBarrel(barrel, itemId) {
-        const maxStackSize = this.game.player.maxStackSize;
-
-        // Try to place entire stack from inventory into barrel
-        const itemCount = this.inventoryManager.getItemCount(itemId);
-        if (itemCount === 0) {
-            console.warn('No items in inventory');
+    onBarrelInputTakeClick(barrel) {
+        // Take items from input slot
+        const taken = barrel.takeFromInput();
+        if (!taken) {
+            console.warn('No items in input slot');
             return;
         }
 
-        // Place item in barrel (returns swapped item if any)
-        const swapped = barrel.placeInInput(itemId, itemCount, maxStackSize);
+        // Add to inventory
+        if (this.inventoryManager.hasRoomFor(taken.itemId)) {
+            this.inventoryManager.addItem(taken.itemId, taken.count);
 
-        // Remove items from inventory
-        this.inventoryManager.removeItem(itemId, itemCount);
+            // Notify about new item
+            this.game.inventoryPanel.notifyItemAdded();
 
-        // If item was swapped, add it back to inventory
-        if (swapped) {
-            this.inventoryManager.addItem(swapped.itemId, swapped.count);
+            // Refresh inventory panel if visible
+            if (this.game.inventoryPanel.isVisible()) {
+                this.game.inventoryPanel.refresh();
+            }
+
+            // Refresh barrel panel to show updated slots
+            if (this.barrelInfoPanel.isVisible()) {
+                this.barrelInfoPanel.refresh();
+            }
+
+            // Update shop affordability
+            this.game.shopMenu.updateAffordability();
+
+            // Save state
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+        } else {
+            // Put items back if inventory is full
+            barrel.inputSlot = taken;
+            console.warn('Inventory is full, cannot take items from barrel');
+        }
+    }
+
+    placeItemInBarrel(barrel, itemId) {
+        const maxStackSize = this.game.player.maxStackSize;
+
+        // Update barrel's max stack size
+        barrel.maxStackSize = maxStackSize;
+
+        // If barrel has a different item type in input, swap it out first
+        if (barrel.inputSlot && barrel.inputSlot.itemId !== itemId) {
+            const swapped = barrel.takeFromInput();
+            if (swapped) {
+                this.inventoryManager.addItem(swapped.itemId, swapped.count);
+            }
+        }
+
+        // Calculate how many items we can add to barrel
+        const currentCount = barrel.inputSlot ? barrel.inputSlot.count : 0;
+        const capacity = maxStackSize - currentCount;
+
+        if (capacity <= 0) {
+            console.warn('Barrel input is full');
+            return;
+        }
+
+        // Collect items from inventory slots until we fill the barrel
+        let remainingCapacity = capacity;
+
+        // Find all slots with this item
+        for (let i = 0; i < this.inventoryManager.slots.length && remainingCapacity > 0; i++) {
+            const slot = this.inventoryManager.slots[i];
+            if (!slot || slot.itemId !== itemId) continue;
+
+            // Take items from this slot
+            const toTake = Math.min(slot.count, remainingCapacity);
+
+            // Remove from inventory
+            this.inventoryManager.removeItem(itemId, toTake);
+
+            // Add to barrel input slot
+            if (!barrel.inputSlot) {
+                barrel.inputSlot = { itemId, count: toTake };
+            } else {
+                barrel.inputSlot.count += toTake;
+            }
+
+            remainingCapacity -= toTake;
         }
 
         // Refresh inventory panel

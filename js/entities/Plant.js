@@ -43,15 +43,25 @@ export class Plant extends Entity {
         // Handle fruit generation for mature fruiting plants
         if (this.growthStage === 'mature') {
             const fruitingConfig = GameConfig.FRUITING.PLANTS[this.targetItemId];
-            if (fruitingConfig && this.nextFruitTime && now >= this.nextFruitTime) {
-                this.generateFruit(fruitingConfig);
+            if (fruitingConfig) {
+                const currentCount = this.fruitSlot ? this.fruitSlot.count : 0;
+
+                // Start timer if we don't have one and we're below max
+                if (currentCount < fruitingConfig.maxFruits && !this.nextFruitTime) {
+                    this.scheduleNextFruit(fruitingConfig);
+                }
+
+                // Generate fruit if below max capacity and timer has expired
+                if (currentCount < fruitingConfig.maxFruits && this.nextFruitTime && now >= this.nextFruitTime) {
+                    this.generateFruit(fruitingConfig);
+                }
             }
         }
     }
 
     scheduleNextFruit(fruitingConfig) {
-        // Calculate random time for next fruit (baseTime ± timeVariance)
-        const variance = (Math.random() * 2 - 1) * fruitingConfig.timeVariance; // -variance to +variance
+        // Calculate random time for next fruit (baseTime to baseTime + timeVariance)
+        const variance = Math.random() * fruitingConfig.timeVariance; // 0 to +timeVariance
         const nextFruitDelay = (fruitingConfig.baseTime + variance) * 1000; // Convert to ms
         this.nextFruitTime = Date.now() + nextFruitDelay;
     }
@@ -158,11 +168,9 @@ export class Plant extends Entity {
         const taken = { ...this.fruitSlot };
         this.fruitSlot = null;
 
-        // Restart fruit generation if this is a fruiting plant
-        const fruitingConfig = GameConfig.FRUITING.PLANTS[this.targetItemId];
-        if (fruitingConfig && this.growthStage === 'mature') {
-            this.scheduleNextFruit(fruitingConfig);
-        }
+        // Clear the timer - update() will schedule a new one on next frame
+        // This ensures at least baseTime delay before next fruit
+        this.nextFruitTime = null;
 
         return taken;
     }
