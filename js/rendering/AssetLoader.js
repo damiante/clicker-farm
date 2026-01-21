@@ -24,12 +24,21 @@ export class AssetLoader {
 
     async preloadAll() {
         const tileAssets = Object.values(GameConfig.TILES);
-        this.totalCount = tileAssets.length;
+
+        // Add structure images to preload list
+        const additionalAssets = [
+            { id: 'fence-horizontal.png', asset: './assets/fence-horizontal.png' },
+            { id: 'fence-vertical.png', asset: './assets/fence-vertical.png' },
+            { id: 'barrel.png', asset: './assets/barrel.png' }
+        ];
+
+        this.totalCount = tileAssets.length + additionalAssets.length;
         this.loadedCount = 0;
 
-        const loadPromises = tileAssets.map(tile =>
-            this.loadImage(tile.id, tile.asset)
-        );
+        const loadPromises = [
+            ...tileAssets.map(tile => this.loadImage(tile.id, tile.asset)),
+            ...additionalAssets.map(asset => this.loadImage(asset.id, asset.asset))
+        ];
 
         try {
             await Promise.all(loadPromises);
@@ -38,6 +47,11 @@ export class AssetLoader {
             console.error('Asset loading failed:', error);
             throw error;
         }
+    }
+
+    getAsset(id) {
+        // Alias for getImage to support both tiles and other assets
+        return this.getImage(id);
     }
 
     getImage(id) {

@@ -49,6 +49,29 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding-right: 5px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(74, 144, 226, 0.5) rgba(44, 62, 80, 0.3);
+}
+
+#top-left::-webkit-scrollbar {
+    width: 8px;
+}
+
+#top-left::-webkit-scrollbar-track {
+    background: rgba(44, 62, 80, 0.3);
+    border-radius: 4px;
+}
+
+#top-left::-webkit-scrollbar-thumb {
+    background: rgba(74, 144, 226, 0.5);
+    border-radius: 4px;
+}
+
+#top-left::-webkit-scrollbar-thumb:hover {
+    background: rgba(74, 144, 226, 0.7);
 }
 
 #top-right {
@@ -475,7 +498,7 @@ body {
 }
 
 /* Plant Info Panel */
-#plant-info-panel {
+.plant-info-panel {
     position: fixed;
     width: 250px;
     background: rgba(44, 62, 80, 0.95);
@@ -487,7 +510,7 @@ body {
     transition: opacity 0.2s, transform 0.2s;
 }
 
-#plant-info-panel.hidden {
+.plant-info-panel.hidden {
     opacity: 0;
     pointer-events: none;
     transform: scale(0.95);

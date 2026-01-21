@@ -16,7 +16,7 @@ export class ShopMenu {
     createContainer() {
         this.container = document.createElement('div');
         this.container.id = 'shop-menus';
-        this.refresh({ autoExpand: true });
+        this.refresh();
     }
 
     refresh(options = {}) {
@@ -105,19 +105,78 @@ export class ShopMenu {
 
         const icon = document.createElement('span');
         icon.className = 'item-icon';
-        icon.textContent = item.emoji;
+
+        // Handle image-based items differently from emoji items
+        if (item.image) {
+            const img = document.createElement('img');
+            img.src = `./assets/${item.image}`;
+            img.alt = item.name;
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'contain';
+            icon.appendChild(img);
+        } else {
+            icon.textContent = item.emoji || '?';
+        }
 
         const name = document.createElement('span');
         name.className = 'item-name';
         name.textContent = item.name;
 
+        const priceContainer = document.createElement('span');
+        priceContainer.className = 'item-price-container';
+
+        // Show money price (or checkmark if tool is owned)
         const price = document.createElement('span');
         price.className = 'item-price';
-        price.textContent = `$${item.salePrice}`;
+
+        // Check if this is an owned tool
+        const isOwnedTool = item.itemType === 'tool' &&
+                           this.game.player.ownedTools &&
+                           this.game.player.ownedTools.includes(item.id);
+
+        if (isOwnedTool) {
+            price.textContent = '✅';
+            name.style.textDecoration = 'line-through';
+        } else {
+            price.textContent = `$${item.salePrice}`;
+        }
+
+        priceContainer.appendChild(price);
+
+        // Show item requirements if any
+        if (item.requirements) {
+            const requirementsDiv = document.createElement('div');
+            requirementsDiv.className = 'item-requirements';
+
+            for (const [requiredItemId, requiredCount] of Object.entries(item.requirements)) {
+                const requiredItem = this.itemRegistry.getItem(requiredItemId);
+                if (requiredItem) {
+                    const reqSpan = document.createElement('span');
+                    reqSpan.className = 'requirement';
+                    reqSpan.textContent = `${requiredItem.emoji || '?'} ${requiredCount}`;
+                    reqSpan.title = `${requiredCount}x ${requiredItem.name}`;
+
+                    // Add hover to show item description
+                    reqSpan.addEventListener('pointerenter', (e) => {
+                        e.stopPropagation();
+                        this.showRequirementPreview(requiredItem, e.clientX, e.clientY);
+                    });
+                    reqSpan.addEventListener('pointerleave', (e) => {
+                        e.stopPropagation();
+                        this.hideRequirementPreview();
+                    });
+
+                    requirementsDiv.appendChild(reqSpan);
+                }
+            }
+
+            priceContainer.appendChild(requirementsDiv);
+        }
 
         itemDiv.appendChild(icon);
         itemDiv.appendChild(name);
-        itemDiv.appendChild(price);
+        itemDiv.appendChild(priceContainer);
 
         itemDiv.addEventListener('pointerdown', (e) => {
             e.preventDefault();
@@ -138,40 +197,130 @@ export class ShopMenu {
     }
 
     onItemClick(item) {
-        // Check if player can afford
+        // Check if tool is already owned
+        if (item.itemType === 'tool') {
+            if (this.game.player.ownedTools && this.game.player.ownedTools.includes(item.id)) {
+                console.warn(`Already own ${item.name}`);
+                return;
+            }
+        }
+
+        // Check if player can afford money cost
         if (this.game.player.money < item.salePrice) {
             console.warn(`Cannot afford ${item.name}`);
             return;
         }
 
-        // Check if inventory has room
-        if (!this.inventoryManager.hasRoomFor(item.id)) {
-            console.warn('Inventory is full');
-            return;
+        // Check item requirements
+        if (item.requirements) {
+            for (const [requiredItemId, requiredCount] of Object.entries(item.requirements)) {
+                const availableCount = this.inventoryManager.getItemCount(requiredItemId);
+                if (availableCount < requiredCount) {
+                    console.warn(`Need ${requiredCount}x ${requiredItemId}, only have ${availableCount}`);
+                    return;
+                }
+            }
         }
 
-        // Purchase item
+        // For non-tools, check if inventory has room AFTER consuming requirements
+        if (item.itemType !== 'tool') {
+            // Temporarily remove required items to check space
+            const removedItems = [];
+            if (item.requirements) {
+                for (const [requiredItemId, requiredCount] of Object.entries(item.requirements)) {
+                    this.inventoryManager.removeItem(requiredItemId, requiredCount);
+                    removedItems.push({ itemId: requiredItemId, count: requiredCount });
+                }
+            }
+
+            const hasRoom = this.inventoryManager.hasRoomFor(item.id);
+
+            // Restore temporarily removed items
+            for (const { itemId, count } of removedItems) {
+                this.inventoryManager.addItem(itemId, count);
+            }
+
+            if (!hasRoom) {
+                console.warn('Not enough inventory space after consuming requirements');
+                return;
+            }
+        }
+
+        // Deduct money
         this.game.player.money = this.game.roundMoney(this.game.player.money - item.salePrice);
         this.game.uiManager.updateMoney(this.game.player.money);
 
-        // Add to inventory
-        if (this.inventoryManager.addItem(item.id)) {
-            // Notify about new item (shows pulse if inventory closed)
-            this.game.inventoryPanel.notifyItemAdded();
-
-            // Refresh inventory panel if visible
-            if (this.game.inventoryPanel.isVisible()) {
-                this.game.inventoryPanel.refresh();
+        // Remove required items from inventory
+        if (item.requirements) {
+            for (const [requiredItemId, requiredCount] of Object.entries(item.requirements)) {
+                this.inventoryManager.removeItem(requiredItemId, requiredCount);
             }
+        }
 
-            // Save state
-            this.game.stateManager.scheduleSave(this.game.getGameState());
-
-            // Update affordability for both shop and inventory
-            this.updateAffordability();
-            if (this.game.inventoryPanel.isVisible()) {
-                this.game.inventoryPanel.updateControlButtons();
+        // Handle tool purchase (add to ownedTools)
+        if (item.itemType === 'tool') {
+            if (!this.game.player.ownedTools) {
+                this.game.player.ownedTools = [];
             }
+            this.game.player.ownedTools.push(item.id);
+            console.log(`Unlocked tool: ${item.name}`);
+        } else {
+            // Add to inventory (non-tools)
+            if (this.inventoryManager.addItem(item.id)) {
+                // Notify about new item (shows pulse if inventory closed)
+                this.game.inventoryPanel.notifyItemAdded();
+            }
+        }
+
+        // Refresh inventory panel if visible
+        if (this.game.inventoryPanel.isVisible()) {
+            this.game.inventoryPanel.refresh();
+        }
+
+        // Save state
+        this.game.stateManager.scheduleSave(this.game.getGameState());
+
+        // Update affordability for both shop and inventory
+        this.updateAffordability();
+        if (this.game.inventoryPanel.isVisible()) {
+            this.game.inventoryPanel.updateControlButtons();
+        }
+    }
+
+    showRequirementPreview(item, x, y) {
+        if (!this.requirementPreview) {
+            this.requirementPreview = document.createElement('div');
+            this.requirementPreview.className = 'requirement-preview';
+            document.body.appendChild(this.requirementPreview);
+        }
+
+        this.requirementPreview.innerHTML = '';
+
+        const icon = document.createElement('div');
+        icon.className = 'preview-icon';
+        icon.textContent = item.emoji || '?';
+
+        const name = document.createElement('div');
+        name.className = 'preview-name';
+        name.textContent = item.name;
+
+        const description = document.createElement('div');
+        description.className = 'preview-description';
+        description.textContent = item.description;
+
+        this.requirementPreview.appendChild(icon);
+        this.requirementPreview.appendChild(name);
+        this.requirementPreview.appendChild(description);
+
+        // Position near mouse
+        this.requirementPreview.style.left = `${x + 10}px`;
+        this.requirementPreview.style.top = `${y + 10}px`;
+        this.requirementPreview.classList.add('visible');
+    }
+
+    hideRequirementPreview() {
+        if (this.requirementPreview) {
+            this.requirementPreview.classList.remove('visible');
         }
     }
 
@@ -182,10 +331,36 @@ export class ShopMenu {
             const item = this.itemRegistry.getItem(itemId);
 
             if (item) {
+                let canAfford = true;
+
+                // Check if tool is already owned
+                if (item.itemType === 'tool') {
+                    if (this.game.player.ownedTools && this.game.player.ownedTools.includes(item.id)) {
+                        itemElement.classList.add('disabled');
+                        return;
+                    }
+                }
+
+                // Check money
                 if (this.game.player.money < item.salePrice) {
-                    itemElement.classList.add('disabled');
-                } else {
+                    canAfford = false;
+                }
+
+                // Check item requirements
+                if (item.requirements) {
+                    for (const [requiredItemId, requiredCount] of Object.entries(item.requirements)) {
+                        const availableCount = this.inventoryManager.getItemCount(requiredItemId);
+                        if (availableCount < requiredCount) {
+                            canAfford = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (canAfford) {
                     itemElement.classList.remove('disabled');
+                } else {
+                    itemElement.classList.add('disabled');
                 }
             }
         });

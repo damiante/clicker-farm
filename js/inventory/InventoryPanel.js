@@ -12,7 +12,7 @@ export class InventoryPanel {
         this.gridContainer = null;
         this.visible = false;
         this.selectedSlotIndex = null; // Currently selected slot for placement
-        this.previewPanel = new ItemPreviewPanel(itemRegistry);
+        this.previewPanel = new ItemPreviewPanel(itemRegistry, inventoryManager);
         this.inventoryButton = null; // Reference to inventory button for notifications
 
         this.createPanel();
@@ -113,7 +113,19 @@ export class InventoryPanel {
             if (item) {
                 const icon = document.createElement('div');
                 icon.className = 'item-icon';
-                icon.textContent = item.emoji;
+
+                // Handle image-based items differently from emoji items
+                if (item.image) {
+                    const img = document.createElement('img');
+                    img.src = `./assets/${item.image}`;
+                    img.alt = item.name;
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'contain';
+                    icon.appendChild(img);
+                } else {
+                    icon.textContent = item.emoji || '?';
+                }
 
                 const count = document.createElement('div');
                 count.className = 'item-count';
@@ -186,12 +198,31 @@ export class InventoryPanel {
                     } else {
                         // Refresh preview with updated slot
                         this.refresh();
-                        this.previewPanel.show(updatedSlot.itemId, onSell);
+                        this.previewPanel.show(updatedSlot.itemId, onSell, onSellAll);
                     }
                 }
             };
 
-            this.previewPanel.show(slot.itemId, onSell);
+            // Sell all callback - removes all items of this type and adds money
+            const onSellAll = () => {
+                const item = this.itemRegistry.getItem(slot.itemId);
+                if (item && item.salePrice > 0) {
+                    const totalCount = this.inventoryManager.getItemCount(slot.itemId);
+                    const totalValue = totalCount * item.salePrice;
+
+                    // Remove all items of this type from inventory
+                    this.inventoryManager.removeItem(slot.itemId, totalCount);
+
+                    // Add money to player
+                    this.game.addMoney(totalValue);
+
+                    // Clear selection since all items are sold
+                    this.clearSelection();
+                    this.refresh();
+                }
+            };
+
+            this.previewPanel.show(slot.itemId, onSell, onSellAll);
         }
 
         this.refresh();

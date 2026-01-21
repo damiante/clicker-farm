@@ -33,6 +33,39 @@ export const GameConfig = {
         DEFAULT_OVERWORLD_SCALE: 1.0,  // Default scale for items without overworldScale property
         PLACEMENT_PREVIEW_OPACITY: 0.4,  // Opacity for placement preview (0-1)
     },
+    FERMENTATION: {
+        // Recipes: input item -> { output, time }
+        RECIPES: {
+            'rice': {
+                output: 'sake',
+                time: 60  // Fermentation time in seconds
+            },
+            'wheat': {
+                output: 'beer',
+                time: 120  // Fermentation time in seconds
+            },
+            'grapes': {
+                output: 'wine',
+                time: 300  // Fermentation time in seconds
+            }
+        }
+    },
+    FRUITING: {
+        // Configuration for plants that produce fruit repeatedly
+        // Plant ID -> { fruitItemId, baseTime, timeVariance, maxFruits, positions }
+        PLANTS: {
+            'grape_vine': {
+                fruitItemId: 'grapes',
+                baseTime: 30,        // Base time in seconds between fruits
+                timeVariance: 90,     // ± variance in seconds (120±30)
+                maxFruits: 2,         // Maximum fruits on plant at once
+                positions: [          // Positions for each fruit (overlay icon config)
+                    { offsetX: 0.15, offsetY: 0.2, scale: 0.4 },   // First grape position
+                    { offsetX: 0.55, offsetY: 0.3, scale: 0.4 }    // Second grape position
+                ]
+            }
+        }
+    },
     STORAGE: {
         SAVE_KEY: 'clickerFarmGameState',
         AUTO_SAVE_INTERVAL: 30000, // 30 seconds

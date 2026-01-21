@@ -3,6 +3,18 @@
     "id": "plants",
     "name": "Plants",
     "emoji": "🌿",
-    "items": ["sunflower_seed", "tree_seed", "hyacinth_seed", "tulip_seed", "rose_seed"]
+    "items": ["sunflower_seed", "tree_seed", "rice_seed", "wheat_seed", "hyacinth_seed", "tulip_seed", "rose_seed", "grape_seed"]
+  },
+  {
+    "id": "tools",
+    "name": "Tools",
+    "emoji": "🛠️",
+    "items": ["axe"]
+  },
+  {
+    "id": "structures",
+    "name": "Structures",
+    "emoji": "🚧",
+    "items": ["fence", "barrel"]
   }
 ]

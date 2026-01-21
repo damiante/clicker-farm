@@ -14,6 +14,8 @@ import { ShopMenu } from '../menus/ShopMenu.js';
 import { DragDropManager } from '../systems/DragDropManager.js';
 import { WorldInteractionManager } from '../systems/WorldInteractionManager.js';
 import { Plant } from '../entities/Plant.js';
+import { Fence } from '../entities/Fence.js';
+import { Barrel } from '../entities/Barrel.js';
 
 export class Game {
     constructor() {
@@ -42,6 +44,7 @@ export class Game {
             stackSizePrice: InventoryConfig.STACK_BASE_PRICE,
             unlockedMenus: [],
             unlockedItems: [],
+            ownedTools: [],  // Track purchased tools (one-time unlocks)
             expansionCount: 0,  // Track number of world expansions
             inventoryNotification: false  // Track unviewed inventory changes
         };
@@ -107,6 +110,10 @@ export class Game {
         });
 
         this.inputManager.on('pan', (event) => {
+            // Don't pan if an item is selected for placement
+            if (this.inventoryPanel && this.inventoryPanel.getSelectedItem()) {
+                return;
+            }
             this.renderer.pan(event.deltaX, event.deltaY);
         });
 
@@ -152,7 +159,7 @@ export class Game {
         // Check for menu and item unlocks
         this.menuManager.checkUnlocks();
         this.menuManager.checkItemUnlocks();
-        this.shopMenu.refresh({ autoExpand: true });
+        this.shopMenu.refresh();
 
         console.log('New game started with seed:', seed);
     }
@@ -166,6 +173,7 @@ export class Game {
         this.player.peakMoney = state.player.peakMoney || state.player.money;
         this.player.unlockedMenus = state.player.unlockedMenus || [];
         this.player.unlockedItems = state.player.unlockedItems || [];
+        this.player.ownedTools = state.player.ownedTools || [];
         this.player.expansionCount = state.player.expansionCount || 0;
         this.player.inventoryNotification = state.player.inventoryNotification || false;
 
@@ -188,7 +196,7 @@ export class Game {
         this.menuManager.checkItemUnlocks();
 
         // Restore menus
-        this.shopMenu.refresh({ autoExpand: true });
+        this.shopMenu.refresh();
 
         // Restore entities
         this.entities = [];
@@ -196,8 +204,17 @@ export class Game {
             if (entityData.type === 'plant') {
                 const plant = Plant.deserialize(entityData, this.itemRegistry);
                 this.entities.push(plant);
+            } else if (entityData.type === 'fence') {
+                const fence = Fence.deserialize(entityData);
+                this.entities.push(fence);
+            } else if (entityData.type === 'barrel') {
+                const barrel = Barrel.deserialize(entityData);
+                this.entities.push(barrel);
             }
         }
+
+        // Update fence orientations after all entities are loaded
+        this.updateFenceOrientations();
 
         this.uiManager.updateMoney(this.player.money);
         this.centerViewOnPlayArea();
@@ -240,6 +257,7 @@ export class Game {
                 stackPrice: inventoryState.stackPrice,
                 unlockedMenus: this.player.unlockedMenus,
                 unlockedItems: this.player.unlockedItems,
+                ownedTools: this.player.ownedTools,
                 expansionCount: this.player.expansionCount,
                 inventoryNotification: this.player.inventoryNotification
             },
@@ -390,6 +408,46 @@ export class Game {
 
         this.stateManager.scheduleSave(this.getGameState());
         return plant;
+    }
+
+    createFenceEntity(itemId, tileX, tileY) {
+        const item = this.itemRegistry.getItem(itemId);
+        if (!item || item.itemType !== 'structure') {
+            console.error('Can only create structures');
+            return null;
+        }
+
+        const fence = new Fence(tileX, tileY, itemId);
+        this.entities.push(fence);
+
+        // Update all fence orientations
+        this.updateFenceOrientations();
+
+        this.stateManager.scheduleSave(this.getGameState());
+        return fence;
+    }
+
+    createBarrelEntity(itemId, tileX, tileY) {
+        const item = this.itemRegistry.getItem(itemId);
+        if (!item || item.itemType !== 'structure') {
+            console.error('Can only create structures');
+            return null;
+        }
+
+        const barrel = new Barrel(tileX, tileY, itemId);
+        this.entities.push(barrel);
+
+        this.stateManager.scheduleSave(this.getGameState());
+        return barrel;
+    }
+
+    updateFenceOrientations() {
+        // Update orientation for all fences
+        for (const entity of this.entities) {
+            if (entity.type === 'fence') {
+                entity.updateOrientation(this);
+            }
+        }
     }
 
     removeEntity(entity) {

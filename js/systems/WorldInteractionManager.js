@@ -1,6 +1,6 @@
-import { Modal } from '../ui/Modal.js';
-import { Button } from '../ui/Button.js';
 import { PlantInfoPanel } from './PlantInfoPanel.js';
+import { FenceInfoPanel } from './FenceInfoPanel.js';
+import { BarrelInfoPanel } from './BarrelInfoPanel.js';
 import { GameConfig } from '../config/GameConfig.js';
 
 export class WorldInteractionManager {
@@ -11,10 +11,15 @@ export class WorldInteractionManager {
         this.itemRegistry = itemRegistry;
         this.inventoryManager = inventoryManager;
         this.inventoryPanel = inventoryPanel;
-        this.plantInfoPanel = new PlantInfoPanel(itemRegistry);
+        this.plantInfoPanel = new PlantInfoPanel(itemRegistry, game);
+        this.fenceInfoPanel = new FenceInfoPanel(itemRegistry);
+        this.barrelInfoPanel = new BarrelInfoPanel(itemRegistry);
 
         this.lastPointerDownPos = null;
         this.currentMousePos = null;  // Track mouse position for placement preview
+        this.isDragging = false;  // Track if user is dragging
+        this.paintedTiles = new Set();  // Track tiles painted during current drag
+        this.justPlacedItem = false;  // Track if item was placed during current click sequence
         this.setupListeners();
     }
 
@@ -22,11 +27,56 @@ export class WorldInteractionManager {
         // Track pointer down position
         this.inputManager.on('pointerdown', (event) => {
             this.lastPointerDownPos = { x: event.position.x, y: event.position.y };
+            this.isDragging = false;
+            this.paintedTiles.clear();
+            this.justPlacedItem = false;
+
+            // If an item is selected, try to paint on pointer down
+            const selectedItem = this.inventoryPanel.getSelectedItem();
+            if (selectedItem) {
+                const worldPos = this.renderer.screenToWorld(event.position.x, event.position.y);
+                const tileX = worldPos.x;
+                const tileY = worldPos.y;
+                const tileKey = `${tileX},${tileY}`;
+
+                if (this.tryPlaceItem(selectedItem.itemId, selectedItem.slotIndex, tileX, tileY)) {
+                    this.paintedTiles.add(tileKey);
+                    this.justPlacedItem = true;
+                }
+            }
         });
 
-        // Track pointer movement for placement preview
+        // Track pointer movement for placement preview and drag painting
         this.inputManager.on('pointermove', (event) => {
             this.currentMousePos = { x: event.position.x, y: event.position.y };
+
+            // Handle drag painting
+            if (this.lastPointerDownPos) {
+                const dx = event.position.x - this.lastPointerDownPos.x;
+                const dy = event.position.y - this.lastPointerDownPos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Start dragging if moved more than threshold
+                if (distance > 5) {
+                    this.isDragging = true;
+                }
+
+                // If dragging and item selected, try to paint
+                const selectedItem = this.inventoryPanel.getSelectedItem();
+                if (this.isDragging && selectedItem) {
+                    const worldPos = this.renderer.screenToWorld(event.position.x, event.position.y);
+                    const tileX = worldPos.x;
+                    const tileY = worldPos.y;
+                    const tileKey = `${tileX},${tileY}`;
+
+                    // Only paint if we haven't painted this tile yet in this drag
+                    if (!this.paintedTiles.has(tileKey)) {
+                        if (this.tryPlaceItem(selectedItem.itemId, selectedItem.slotIndex, tileX, tileY)) {
+                            this.paintedTiles.add(tileKey);
+                        }
+                    }
+                }
+            }
         });
 
         // Handle click (pointer up near pointer down location)
@@ -38,11 +88,18 @@ export class WorldInteractionManager {
             const dy = event.position.y - this.lastPointerDownPos.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance < 5) {  // 5 pixel threshold for click vs drag
-                this.onCanvasClick(event.position.x, event.position.y);
+            if (distance < 5 && !this.isDragging) {
+                // Only handle click if no item selected and we didn't just place an item
+                const selectedItem = this.inventoryPanel.getSelectedItem();
+                if (!selectedItem && !this.justPlacedItem) {
+                    this.onCanvasClick(event.position.x, event.position.y);
+                }
             }
 
             this.lastPointerDownPos = null;
+            this.isDragging = false;
+            this.paintedTiles.clear();
+            this.justPlacedItem = false;
         });
     }
 
@@ -65,8 +122,8 @@ export class WorldInteractionManager {
 
         // Convert to world coordinates
         const worldPos = this.renderer.screenToWorld(screenX, screenY);
-        const tileX = worldPos.x;
-        const tileY = worldPos.y;
+        const tileX = Math.floor(worldPos.x);
+        const tileY = Math.floor(worldPos.y);
 
         // Check if there's a selected item from inventory (placement mode)
         const selectedItem = this.inventoryPanel.getSelectedItem();
@@ -84,8 +141,293 @@ export class WorldInteractionManager {
         if (entity) {
             if (entity.type === 'plant') {
                 this.showPlantMenu(entity);
+            } else if (entity.type === 'fence') {
+                this.showFenceMenu(entity);
+            } else if (entity.type === 'barrel') {
+                this.showBarrelMenu(entity);
             }
         }
+    }
+
+    showFenceMenu(fence) {
+        // Convert fence world coordinates to screen coordinates
+        const screenPos = this.renderer.worldToScreen(fence.x + 0.5, fence.y + 0.5);
+
+        // Show the fence info panel
+        this.fenceInfoPanel.show(fence, screenPos.x, screenPos.y, (pickedUpFence) => {
+            this.pickupFence(pickedUpFence);
+        });
+    }
+
+    pickupFence(fence) {
+        const itemId = fence.itemId;
+
+        // Add to inventory
+        if (this.inventoryManager.hasRoomFor(itemId)) {
+            this.inventoryManager.addItem(itemId);
+
+            // Notify about new item (shows pulse if inventory closed)
+            this.game.inventoryPanel.notifyItemAdded();
+
+            // Remove fence entity
+            this.game.removeEntity(fence);
+
+            // Update all remaining fence orientations
+            this.game.updateFenceOrientations();
+
+            // Refresh inventory panel if visible
+            if (this.game.inventoryPanel.isVisible()) {
+                this.game.inventoryPanel.refresh();
+            }
+
+            // Update shop affordability (items may now meet requirements)
+            this.game.shopMenu.updateAffordability();
+
+            // Save state
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+        } else {
+            console.warn('Inventory is full, cannot pick up fence');
+        }
+    }
+
+    showBarrelMenu(barrel) {
+        // Convert barrel world coordinates to screen coordinates
+        const screenPos = this.renderer.worldToScreen(barrel.x + 0.5, barrel.y + 0.5);
+
+        // Show the barrel info panel with callbacks
+        this.barrelInfoPanel.show(
+            barrel,
+            screenPos.x,
+            screenPos.y,
+            (pickedUpBarrel) => this.pickupBarrel(pickedUpBarrel),
+            (clickedBarrel) => this.onBarrelInputSlotClick(clickedBarrel),
+            (clickedBarrel) => this.onBarrelOutputSlotClick(clickedBarrel)
+        );
+    }
+
+    onBarrelInputSlotClick(barrel) {
+        // Get selected item from inventory
+        const selectedItem = this.inventoryPanel.getSelectedItem();
+
+        if (!selectedItem) {
+            // No item selected - show dropdown menu
+            this.barrelInfoPanel.showItemDropdown(this.inventoryManager, (selectedItemId) => {
+                this.placeItemInBarrel(barrel, selectedItemId);
+            });
+            return;
+        }
+
+        // Item is selected - place it directly
+        this.placeItemInBarrel(barrel, selectedItem.itemId);
+    }
+
+    placeItemInBarrel(barrel, itemId) {
+        const maxStackSize = this.game.player.maxStackSize;
+
+        // Try to place entire stack from inventory into barrel
+        const itemCount = this.inventoryManager.getItemCount(itemId);
+        if (itemCount === 0) {
+            console.warn('No items in inventory');
+            return;
+        }
+
+        // Place item in barrel (returns swapped item if any)
+        const swapped = barrel.placeInInput(itemId, itemCount, maxStackSize);
+
+        // Remove items from inventory
+        this.inventoryManager.removeItem(itemId, itemCount);
+
+        // If item was swapped, add it back to inventory
+        if (swapped) {
+            this.inventoryManager.addItem(swapped.itemId, swapped.count);
+        }
+
+        // Refresh inventory panel
+        this.inventoryPanel.refresh();
+
+        // Refresh barrel panel to show updated slots
+        if (this.barrelInfoPanel.isVisible()) {
+            this.barrelInfoPanel.refresh();
+        }
+
+        // Refresh dropdown if it's open
+        this.barrelInfoPanel.refreshDropdown();
+
+        // Check if there are still items of this type
+        const remainingCount = this.inventoryManager.getItemCount(itemId);
+        if (remainingCount === 0) {
+            this.inventoryPanel.clearSelection();
+        }
+
+        // Update shop affordability
+        this.game.shopMenu.updateAffordability();
+
+        // Save state
+        this.game.stateManager.scheduleSave(this.game.getGameState());
+    }
+
+    onBarrelOutputSlotClick(barrel) {
+        // Take item from output slot
+        const taken = barrel.takeFromOutput();
+        if (!taken) {
+            console.warn('No item in output slot');
+            return;
+        }
+
+        // Add to inventory
+        if (this.inventoryManager.hasRoomFor(taken.itemId)) {
+            this.inventoryManager.addItem(taken.itemId, taken.count);
+
+            // Notify about new item
+            this.game.inventoryPanel.notifyItemAdded();
+
+            // Refresh inventory panel if visible
+            if (this.game.inventoryPanel.isVisible()) {
+                this.game.inventoryPanel.refresh();
+            }
+
+            // Refresh barrel panel to show updated slots
+            if (this.barrelInfoPanel.isVisible()) {
+                this.barrelInfoPanel.refresh();
+            }
+
+            // Update shop affordability
+            this.game.shopMenu.updateAffordability();
+
+            // Save state
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+        } else {
+            // Put item back if inventory is full
+            barrel.outputSlot = taken;
+            console.warn('Inventory is full, cannot take item from barrel');
+        }
+    }
+
+    pickupBarrel(barrel) {
+        const itemId = barrel.itemId;
+
+        // Add to inventory
+        if (this.inventoryManager.hasRoomFor(itemId)) {
+            this.inventoryManager.addItem(itemId);
+
+            // Notify about new item (shows pulse if inventory closed)
+            this.game.inventoryPanel.notifyItemAdded();
+
+            // Remove barrel entity
+            this.game.removeEntity(barrel);
+
+            // Refresh inventory panel if visible
+            if (this.game.inventoryPanel.isVisible()) {
+                this.game.inventoryPanel.refresh();
+            }
+
+            // Update shop affordability (items may now meet requirements)
+            this.game.shopMenu.updateAffordability();
+
+            // Save state
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+        } else {
+            console.warn('Inventory is full, cannot pick up barrel');
+        }
+    }
+
+    tryPlaceItem(itemId, _slotIndex, tileX, tileY) {
+        // Silent version of placeItemOnTile for drag painting
+        // Returns true if placement succeeded, false otherwise
+        // Note: slotIndex parameter is kept for API compatibility but not used
+
+        const item = this.itemRegistry.getItem(itemId);
+        if (!item) return false;
+
+        // Validate item is placeable
+        if (item.itemType !== 'seed' && item.itemType !== 'structure') return false;
+
+        // Check if player has this item in inventory
+        if (this.inventoryManager.getItemCount(itemId) === 0) return false;
+
+        // Ensure tile coordinates are integers
+        tileX = Math.floor(tileX);
+        tileY = Math.floor(tileY);
+
+        // Get the tile at this position
+        const tile = this.game.chunkManager.getTile(tileX, tileY);
+        if (!tile || tile.type !== 'grass') return false;
+
+        // Check if there's already an entity at this position
+        const existingEntity = this.game.entities.find(e =>
+            Math.floor(e.x) === tileX && Math.floor(e.y) === tileY
+        );
+        if (existingEntity) return false;
+
+        // Valid placement - create the appropriate entity
+        if (item.itemType === 'seed') {
+            this.game.createPlantEntity(itemId, tileX, tileY);
+        } else if (item.itemType === 'structure') {
+            if (itemId === 'fence') {
+                this.game.createFenceEntity(itemId, tileX, tileY);
+            } else if (itemId === 'barrel') {
+                this.game.createBarrelEntity(itemId, tileX, tileY);
+            }
+        }
+
+        // Remove item from inventory
+        this.inventoryManager.removeItem(itemId, 1);
+
+        // Refresh inventory panel
+        this.inventoryPanel.refresh();
+
+        // Check if there are still items of this type
+        const remainingCount = this.inventoryManager.getItemCount(itemId);
+        if (remainingCount === 0) {
+            // No more items of this type, clear selection
+            this.inventoryPanel.clearSelection();
+        } else {
+            // Find the first slot with this itemId (might be different from original slot)
+            const newSlotIndex = this.inventoryManager.slots.findIndex(s => s && s.itemId === itemId);
+            if (newSlotIndex !== -1) {
+                // Update selection to the new slot
+                this.inventoryPanel.selectedSlotIndex = newSlotIndex;
+                const slot = this.inventoryManager.slots[newSlotIndex];
+
+                const onSell = () => {
+                    const item = this.itemRegistry.getItem(slot.itemId);
+                    if (item && item.salePrice > 0) {
+                        this.inventoryManager.removeItem(slot.itemId, 1);
+                        this.game.addMoney(item.salePrice);
+
+                        const remainingCount = this.inventoryManager.getItemCount(slot.itemId);
+                        if (remainingCount === 0) {
+                            this.inventoryPanel.clearSelection();
+                        } else {
+                            this.inventoryPanel.refresh();
+                            this.inventoryPanel.previewPanel.show(slot.itemId, onSell, onSellAll);
+                        }
+                    }
+                };
+
+                const onSellAll = () => {
+                    const item = this.itemRegistry.getItem(slot.itemId);
+                    if (item && item.salePrice > 0) {
+                        const totalCount = this.inventoryManager.getItemCount(slot.itemId);
+                        const totalValue = totalCount * item.salePrice;
+                        this.inventoryManager.removeItem(slot.itemId, totalCount);
+                        this.game.addMoney(totalValue);
+                        this.inventoryPanel.clearSelection();
+                        this.inventoryPanel.refresh();
+                    }
+                };
+
+                this.inventoryPanel.previewPanel.show(slot.itemId, onSell, onSellAll);
+            } else {
+                // Shouldn't happen, but clear selection just in case
+                this.inventoryPanel.clearSelection();
+            }
+        }
+
+        // Save state
+        this.game.stateManager.scheduleSave(this.game.getGameState());
+
+        return true;
     }
 
     placeItemOnTile(itemId, slotIndex, tileX, tileY) {
@@ -95,12 +437,16 @@ export class WorldInteractionManager {
             return;
         }
 
-        // Validate item is a seed
-        if (item.itemType !== 'seed') {
-            console.warn(`Cannot place ${item.name}: only seeds can be planted`);
+        // Validate item is placeable (seed or structure)
+        if (item.itemType !== 'seed' && item.itemType !== 'structure') {
+            console.warn(`Cannot place ${item.name}: only seeds and structures can be placed`);
             this.inventoryPanel.clearSelection();
             return;
         }
+
+        // Ensure tile coordinates are integers
+        tileX = Math.floor(tileX);
+        tileY = Math.floor(tileY);
 
         // Get the tile at this position
         const tile = this.game.chunkManager.getTile(tileX, tileY);
@@ -112,7 +458,7 @@ export class WorldInteractionManager {
 
         // Check if tile is grass
         if (tile.type !== 'grass') {
-            console.warn('Cannot place item: can only plant on grass tiles');
+            console.warn('Cannot place item: can only place on grass tiles');
             this.inventoryPanel.clearSelection();
             return;
         }
@@ -128,8 +474,16 @@ export class WorldInteractionManager {
             return;
         }
 
-        // Valid placement - create the plant entity
-        this.game.createPlantEntity(itemId, tileX, tileY);
+        // Valid placement - create the appropriate entity
+        if (item.itemType === 'seed') {
+            this.game.createPlantEntity(itemId, tileX, tileY);
+        } else if (item.itemType === 'structure') {
+            if (itemId === 'fence') {
+                this.game.createFenceEntity(itemId, tileX, tileY);
+            } else if (itemId === 'barrel') {
+                this.game.createBarrelEntity(itemId, tileX, tileY);
+            }
+        }
 
         // Remove item from inventory (use itemId, not slotIndex)
         this.inventoryManager.removeItem(itemId, 1);
@@ -155,17 +509,28 @@ export class WorldInteractionManager {
                         this.inventoryPanel.clearSelection();
                     } else {
                         this.inventoryPanel.refresh();
-                        this.inventoryPanel.previewPanel.show(updatedSlot.itemId, onSell);
+                        this.inventoryPanel.previewPanel.show(updatedSlot.itemId, onSell, onSellAll);
                     }
                 }
             };
-            this.inventoryPanel.previewPanel.show(slot.itemId, onSell);
+
+            const onSellAll = () => {
+                const item = this.itemRegistry.getItem(slot.itemId);
+                if (item && item.salePrice > 0) {
+                    const totalCount = this.inventoryManager.getItemCount(slot.itemId);
+                    const totalValue = totalCount * item.salePrice;
+                    this.inventoryManager.removeItem(slot.itemId, totalCount);
+                    this.game.addMoney(totalValue);
+                    this.inventoryPanel.clearSelection();
+                    this.inventoryPanel.refresh();
+                }
+            };
+
+            this.inventoryPanel.previewPanel.show(slot.itemId, onSell, onSellAll);
         }
 
         // Save state
         this.game.stateManager.scheduleSave(this.game.getGameState());
-
-        console.log(`Placed ${item.name} at (${tileX}, ${tileY})`);
     }
 
     showPlantMenu(plant) {
@@ -173,13 +538,60 @@ export class WorldInteractionManager {
         const screenPos = this.renderer.worldToScreen(plant.x + 0.5, plant.y + 0.5);
 
         // Show the plant info panel
-        this.plantInfoPanel.show(plant, screenPos.x, screenPos.y, (harvestedPlant) => {
-            this.harvestPlant(harvestedPlant);
-        });
+        this.plantInfoPanel.show(
+            plant,
+            screenPos.x,
+            screenPos.y,
+            (harvestedPlant) => {
+                this.harvestPlant(harvestedPlant);
+            },
+            (fruitPlant) => {
+                this.takePlantFruit(fruitPlant);
+            }
+        );
+    }
+
+    takePlantFruit(plant) {
+        // Take fruit from the plant
+        const taken = plant.takeFruit();
+        if (!taken) {
+            return;
+        }
+
+        // Add to inventory
+        if (this.inventoryManager.hasRoomFor(taken.itemId)) {
+            this.inventoryManager.addItem(taken.itemId, taken.count);
+
+            // Notify about new item
+            this.game.inventoryPanel.notifyItemAdded();
+
+            // Refresh panels
+            if (this.game.inventoryPanel.isVisible()) {
+                this.game.inventoryPanel.refresh();
+            }
+
+            // Hide and reshow the plant panel to update the fruit slot
+            this.plantInfoPanel.hide();
+            this.showPlantMenu(plant);
+
+            // Save state
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+        } else {
+            console.warn('Inventory is full, cannot take fruit');
+        }
     }
 
     harvestPlant(plant) {
-        const harvestedItemId = plant.harvest();
+        // Check if plant requires a tool
+        if (plant.requiresTool(this.itemRegistry)) {
+            const requiredTool = plant.getRequiredTool(this.itemRegistry);
+            if (!this.game.player.ownedTools || !this.game.player.ownedTools.includes(requiredTool)) {
+                console.warn(`Cannot harvest: ${requiredTool} required`);
+                return;
+            }
+        }
+
+        const harvestedItemId = plant.harvest(this.itemRegistry);
 
         // Add to inventory
         if (this.inventoryManager.hasRoomFor(harvestedItemId)) {
@@ -196,10 +608,11 @@ export class WorldInteractionManager {
                 this.game.inventoryPanel.refresh();
             }
 
+            // Update shop affordability (items may now meet requirements)
+            this.game.shopMenu.updateAffordability();
+
             // Save state
             this.game.stateManager.scheduleSave(this.game.getGameState());
-
-            console.log(`Harvested ${harvestedItemId}`);
         } else {
             console.warn('Inventory is full, cannot harvest');
         }
@@ -213,12 +626,12 @@ export class WorldInteractionManager {
         if (!selectedItem) return;
 
         const item = this.itemRegistry.getItem(selectedItem.itemId);
-        if (!item || item.itemType !== 'seed') return;
+        if (!item || (item.itemType !== 'seed' && item.itemType !== 'structure')) return;
 
         // Convert mouse position to world coordinates
         const worldPos = this.renderer.screenToWorld(this.currentMousePos.x, this.currentMousePos.y);
-        const tileX = worldPos.x;
-        const tileY = worldPos.y;
+        const tileX = Math.floor(worldPos.x);
+        const tileY = Math.floor(worldPos.y);
 
         // Check if this is a valid placement location
         const tile = this.game.chunkManager.getTile(tileX, tileY);
@@ -235,21 +648,37 @@ export class WorldInteractionManager {
         const screenX = Math.floor(tileX * tileSize - camera.x);
         const screenY = Math.floor(tileY * tileSize - camera.y);
 
-        // Apply item-specific overworld scale
-        const scale = item.overworldScale !== undefined ? item.overworldScale : GameConfig.ENTITIES.DEFAULT_OVERWORLD_SCALE;
-        const fontSize = Math.floor(GameConfig.ENTITIES.RENDER_EMOJI_FONT_SIZE * scale);
-
-        // Render translucent emoji preview
         ctx.save();
         ctx.globalAlpha = GameConfig.ENTITIES.PLACEMENT_PREVIEW_OPACITY;
-        ctx.font = `${fontSize}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(
-            item.emoji,
-            screenX + (tileSize / 2),
-            screenY + (tileSize / 2)
-        );
+
+        // Handle image-based items differently from emoji items
+        if (item.image) {
+            // For image-based items (like fences), render the image
+            const image = this.game.assetLoader.getAsset(item.image);
+            if (image) {
+                ctx.drawImage(
+                    image,
+                    screenX,
+                    screenY,
+                    tileSize,
+                    tileSize
+                );
+            }
+        } else {
+            // For emoji-based items, render the emoji
+            const scale = item.overworldScale !== undefined ? item.overworldScale : GameConfig.ENTITIES.DEFAULT_OVERWORLD_SCALE;
+            const fontSize = Math.floor(GameConfig.ENTITIES.RENDER_EMOJI_FONT_SIZE * scale);
+
+            ctx.font = `${fontSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(
+                item.emoji,
+                screenX + (tileSize / 2),
+                screenY + (tileSize / 2)
+            );
+        }
+
         ctx.restore();
     }
 }

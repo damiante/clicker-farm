@@ -116,7 +116,22 @@ export class Renderer {
             // Viewport culling - only render visible entities
             if (entity.x >= visibleStartX && entity.x <= visibleEndX &&
                 entity.y >= visibleStartY && entity.y <= visibleEndY) {
-                entity.render(this.ctx, this.camera.x, this.camera.y, tileSize, itemRegistry);
+                // Pass assetLoader for entities that need images (like fences and barrels)
+                if (entity.type === 'fence' || entity.type === 'barrel') {
+                    entity.render(this.ctx, this.camera.x, this.camera.y, tileSize, this.assetLoader);
+                } else {
+                    entity.render(this.ctx, this.camera.x, this.camera.y, tileSize, itemRegistry);
+                }
+
+                // Render overlay icons if entity has any
+                if (typeof entity.getOverlayIcons === 'function') {
+                    const overlays = entity.getOverlayIcons();
+                    if (overlays && Array.isArray(overlays)) {
+                        for (const overlay of overlays) {
+                            this.renderOverlayIcon(entity, overlay, tileSize, itemRegistry);
+                        }
+                    }
+                }
             }
         }
 
@@ -135,6 +150,49 @@ export class Renderer {
             this.ctx.fillStyle = tileType === 'water' ? '#4A90E2' : '#2ECC71';
             this.ctx.fillRect(screenX, screenY, tileSize + 1, tileSize + 1);
         }
+    }
+
+    renderOverlayIcon(entity, overlay, tileSize, itemRegistry) {
+        // Get the item to render
+        const item = itemRegistry.getItem(overlay.itemId);
+        if (!item) return;
+
+        // Calculate base position of the entity tile
+        const baseScreenX = Math.floor(entity.x * tileSize - this.camera.x);
+        const baseScreenY = Math.floor(entity.y * tileSize - this.camera.y);
+
+        // Calculate overlay size and position
+        const overlaySize = Math.floor(tileSize * overlay.scale);
+        const overlayX = Math.floor(baseScreenX + (overlay.offsetX * tileSize));
+        const overlayY = Math.floor(baseScreenY + (overlay.offsetY * tileSize));
+
+        this.ctx.save();
+
+        if (item.image) {
+            // Render image-based item
+            const image = this.assetLoader.getAsset(item.image);
+            if (image) {
+                this.ctx.drawImage(
+                    image,
+                    overlayX,
+                    overlayY,
+                    overlaySize,
+                    overlaySize
+                );
+            }
+        } else if (item.emoji) {
+            // Render emoji-based item
+            this.ctx.font = `${overlaySize}px Arial`;
+            this.ctx.textAlign = 'left';
+            this.ctx.textBaseline = 'top';
+            this.ctx.fillText(
+                item.emoji,
+                overlayX,
+                overlayY
+            );
+        }
+
+        this.ctx.restore();
     }
 
     renderExpansionButtons(chunkManager, onExpand) {

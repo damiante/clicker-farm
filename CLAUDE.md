@@ -32,12 +32,13 @@ This document provides architectural guidance for developers and AI agents worki
 **Location**: `js/rendering/`
 
 - **Renderer.js**: Canvas rendering with viewport culling, zoom/pan, grid lines
-- **AssetLoader.js**: Image caching
+- **AssetLoader.js**: Image caching with preload list for fence images
 - Viewport culling only renders visible tiles/entities
 - Camera system with zoom (0.25-4.0x) and pan
 - Anti-aliasing prevention: `imageSmoothingEnabled = false`, floored positions
 - Tiles rendered with 1px overlap to prevent background gaps
 - Grid lines drawn as solid lines (not stroked rectangles) for better visibility
+- Supports both emoji rendering and image assets (fences use PNG files)
 
 ### State Management
 **Location**: `js/core/StateManager.js`
@@ -53,27 +54,35 @@ This document provides architectural guidance for developers and AI agents worki
 
 - **InventoryManager.js**: Business logic for add/remove/expand
 - **InventoryPanel.js**: Right-side sliding panel UI
-- **ItemPreviewPanel.js**: Floating preview with sell functionality
+- **ItemPreviewPanel.js**: Floating preview with sell/sell-all functionality
 - Expandable slots (3-20) and stack sizes (5-1000)
 - Exponential pricing: `price = base * (growth ^ count)`
 - Selection persistence: items stay selected after placement
+- Image rendering support for non-emoji items (structure icons)
 
 ### Shop & Menus
 **Location**: `js/menus/`
 
 - **MenuManager.js**: Menu unlock logic based on `player.peakMoney`
-- **ShopMenu.js**: Left-side collapsible shop UI
+- **ShopMenu.js**: Left-side collapsible shop UI with scrolling support
 - Menus unlock when `peakMoney >= minItemPrice` (note: `>=` not `>`)
 - Menu expand/collapse state independent of money
-- Auto-expand only on initial load
+- Item requirements displayed with hover tooltips
+- Tool ownership shown with checkmark and strikethrough
+- Affordability checking includes money + item requirements
+- Image rendering support for structure items
 
 ### Item System
 **Location**: `js/items/`, `data/items.json`
 
 - **ItemRegistry.js**: Loads and caches item data from JSON
-- **items.json**: Item definitions with emoji, prices, growth times, scaling
-- Item types: seed, plant, growth_stage
+- **items.json**: Item definitions with emoji/image, prices, growth times, scaling, requirements
+- Item types: seed, plant, growth_stage, tool, structure, resource
 - `overworldScale` property controls rendering size (default: 1.0)
+- `seedlingScale` property controls seedling-stage rendering size (allows different sizes per plant type)
+- Image-based items (e.g. fences, barrels) use `image` property instead of `emoji`
+- Items can have `requirements` (e.g. fence requires wood, barrel requires wood)
+- Tools are one-time purchases stored in `player.ownedTools`
 
 ### Plant Growth
 **Location**: `js/entities/Plant.js`
@@ -81,27 +90,88 @@ This document provides architectural guidance for developers and AI agents worki
 - Timestamp-based growth using `Date.now()`
 - Growth stages: seed → seedling → mature
 - Transition times: `plantedAt + sproutTime`, `plantedAt + sproutTime + maturityTime`
-- Renders using item emoji scaled by `overworldScale`
+- Renders using item emoji scaled by `overworldScale` (or `seedlingScale` during seedling stage)
+- Seedling scale from original seed item allows per-plant-type sizes (e.g., tree seedlings larger than flowers)
+- Plant types: `plantType` property (flower, tree, grain, fruiting)
+- Trees require tools to harvest (axe), other types don't
+- Trees yield wood resource, flowers/grains yield themselves
+- **Fruiting plants**: Special plant type that generates fruit over time when mature
+  - Configurable in `GameConfig.FRUITING.PLANTS` with `fruitItemId`, `baseTime`, `timeVariance`, `maxFruits`, `positions`
+  - Fruits appear as overlay icons at configured positions on the plant tile
+  - Must take fruit before harvesting the plant
+  - After taking fruit, generation timer restarts automatically
 - Survives page refresh, immune to frame rate variations
+
+### Structure Entities (Fences)
+**Location**: `js/entities/Fence.js`
+
+- Dynamic tiling: orientation updates based on neighboring fences
+- Horizontal/vertical variants using different image assets
+- `updateOrientation()`: checks north/south neighbors to determine orientation
+- All fences update when any fence is added or removed (`updateFenceOrientations()`)
+- Click to pickup: returns to inventory, triggers neighbor updates
+- Image-based rendering (fence-horizontal.png, fence-vertical.png)
+
+### Structure Entities (Barrels)
+**Location**: `js/entities/Barrel.js`
+
+- **Fermentation system**: Two-slot structure for fermenting items (input → output)
+- Input slot (left): accepts fermentable items, consumption begins immediately
+- Output slot (right): read-only, collects fermented products
+- Progress tracked with timestamp-based fermentation timer
+- Recipes defined in `GameConfig.FERMENTATION.RECIPES` with `{output, time}` structure
+- Each recipe has individual fermentation time (e.g., rice→sake: 60s, wheat→beer: 120s, grapes→wine: 300s)
+- Stack processing: items ferment sequentially, timer restarts for each item
+- Output stacks up to `maxStackSize` before blocking further fermentation
+- Cannot pickup while fermenting or containing items
+- **Overlay icons**: Shows input/output slot contents at bottom-left/right of barrel tile
+- Image-based rendering (barrel.png)
+- **BarrelInfoPanel.js**: Special UI with two slots, progress arrow, dropdown for item selection
+
+### Overlay Icon System
+**Location**: `js/rendering/Renderer.js`
+
+- Extensible system for displaying multiple icons on a single entity tile
+- Entities implement `getOverlayIcons()` returning array of `{itemId, offsetX, offsetY, scale}` configs
+- Used by: Barrels (input/output slots), Fruiting plants (fruits)
+- Offset values are tile-relative (0 = left/top, 1 = right/bottom)
+- Scale is relative to tile size (e.g., 0.33 = 33% of tile)
+- Renderer calls `renderOverlayIcon()` for each overlay after main entity render
 
 ### World Interaction
 **Location**: `js/systems/WorldInteractionManager.js`
 
 - Click detection: pointerdown → pointerup with minimal drag distance
 - Placement: validates tile type (grass only), checks for existing entities
-- Harvesting: click mature plants to add to inventory
-- Placement preview: translucent emoji (40% opacity) on hover
+- Harvesting: click mature plants to add to inventory, validates tool ownership
+- Drag painting: hold and drag to paint multiple tiles with selected item
+- Set-based duplicate prevention: `paintedTiles` tracks painted tiles per drag
+- Selection persistence: continues across multiple stacks of same item
+- Placement preview: translucent emoji/image (40% opacity) on hover
 - Mouse position tracking for preview rendering
+- Coordinate flooring critical for entity click detection
 
 ### UI Components
-**Location**: `js/ui/`
+**Location**: `js/ui/`, `js/systems/`
 
 - **Modal.js**: Base modal with overlay and animation
-- **Button.js**: Themed button component
+- **Button.js**: Themed button component with `setText()` and `setEnabled()` methods
 - **UIManager.js**: Orchestrates UI creation and updates
 - **SettingsMenu.js**: Grid toggle and reset functionality
 - **PlantInfoPanel.js**: Floating panel for plant status
+  - Dynamic harvest emoji (🪓 for trees, ✂️ for flowers/grains)
+  - Fruit slot display for fruiting plants with "Take" button (🫴 emoji)
+  - Harvest button disabled when fruit present ("Take fruit first" message)
+  - Panel refresh pattern: separate `buildPanel()` (once) and `refresh()` (frequent) to preserve event listeners
+- **FenceInfoPanel.js**: Floating panel for structure interaction (pickup)
+- **BarrelInfoPanel.js**: Floating panel for barrel interaction
+  - Two-slot layout (input/output) with progress arrow between them
+  - Click input slot to show dropdown or place selected item
+  - Click output slot to take fermented products
+  - Dropdown auto-refreshes when inventory changes
+  - Progress bar fills left-to-right showing fermentation progress
 - All components consume UITheme.js for consistent styling
+- CSS class selectors (not ID) allow style reuse across similar panels
 
 ### Input Handling
 **Location**: `js/core/InputManager.js`
@@ -119,17 +189,21 @@ Main orchestrator:
 - `start()`: Begin requestAnimationFrame loop
 - `update(deltaTime)`: Update entities
 - `render()`: Render world → entities → grid → placement preview → UI
-- Central methods: `addMoney()`, `expandWorld()`, `createPlantEntity()`
+- Central methods: `addMoney()`, `expandWorld()`, `createPlantEntity()`, `createFenceEntity()`
+- `updateFenceOrientations()`: Updates all fence tiling after fence add/remove
+- Panning disabled when item selected for placement
 
 ## Configuration Files
 
 ### GameConfig.js
-**All game constants** - tile size, chunk size, river generation, entity rendering, expansion pricing, economy values, storage settings
+**All game constants** - tile size, chunk size, river generation, entity rendering, expansion pricing, economy values, fermentation recipes, fruiting plant configs, storage settings
 
 Key sections:
 - `WORLD`: Chunk sizes, river parameters, expansion costs
 - `ECONOMY`: Starting money, click reward
 - `ENTITIES`: Font size, default scale, preview opacity
+- `FERMENTATION`: Recipe definitions mapping input items to `{output, time}` configs
+- `FRUITING`: Fruiting plant configs with `{fruitItemId, baseTime, timeVariance, maxFruits, positions}`
 - `STORAGE`: Save key, auto-save interval
 - `TILES`: Tile definitions with assets and codes
 
@@ -160,6 +234,7 @@ Key sections:
     inventorySlotsPrice: 10,
     stackSizePrice: 20,
     unlockedMenus: [],
+    ownedTools: ['axe'],  // One-time tool purchases
     expansionCount: 0
   },
   settings: {
@@ -169,7 +244,11 @@ Key sections:
     seed: 42,
     chunks: [{x, y, tiles: "compressed", edgeBoundaries}]
   },
-  entities: [{type, x, y, itemId, growthStage, plantedAt, targetItemId}]
+  entities: [
+    {type: 'plant', x, y, seedItemId, itemId, growthStage, plantedAt, targetItemId, fruitSlot, nextFruitTime},
+    {type: 'fence', x, y, itemId, orientation},
+    {type: 'barrel', x, y, itemId, inputSlot, outputSlot, fermentationStartTime, fermentationTime, maxStackSize}
+  ]
 }
 ```
 
@@ -178,7 +257,35 @@ Key sections:
 ### Add a New Item
 1. Add definition to `data/items.json` with all required fields
 2. Add to menu in `data/menus.json` if purchasable
-3. If new item type, update ItemRegistry/InventoryManager logic
+3. For seeds, include `seedlingScale` to control seedling size
+4. For fruiting plants, set `plantType: "fruiting"` and configure in `GameConfig.FRUITING.PLANTS`
+5. If new item type, update ItemRegistry/InventoryManager logic
+
+### Add a Fermentation Recipe
+1. Add input and output items to `data/items.json`
+2. Add recipe to `GameConfig.FERMENTATION.RECIPES`: `'inputId': {output: 'outputId', time: seconds}`
+3. Test in barrel to verify timing and output
+
+### Add a Fruiting Plant
+1. Add seed, plant, and fruit items to `data/items.json`
+   - Seed: normal seed item with `growsInto` pointing to plant
+   - Plant: `plantType: "fruiting"`, use appropriate emoji (e.g., 🌿 for vines)
+   - Fruit: resource item that will be produced (e.g., 🍇 grapes)
+2. Add config to `GameConfig.FRUITING.PLANTS`:
+   ```javascript
+   'plant_id': {
+     fruitItemId: 'fruit_id',
+     baseTime: 120,           // Average seconds between fruits
+     timeVariance: 30,        // ± random variance
+     maxFruits: 2,            // Max fruits on plant at once
+     positions: [             // Icon positions for each fruit
+       {offsetX: 0.15, offsetY: 0.2, scale: 0.4},
+       {offsetX: 0.55, offsetY: 0.3, scale: 0.4}
+     ]
+   }
+   ```
+3. Optionally add fermentation recipe if fruit can be fermented
+4. Test: plant seed, wait for maturity, verify fruit generation and overlay display
 
 ### Add a New Entity Type
 1. Create class extending Entity in `js/entities/`
@@ -240,7 +347,9 @@ js/
 │   └── SettingsMenu.js       # ⚙️  Settings modal
 ├── entities/
 │   ├── Entity.js             # 🧬 Base entity class
-│   └── Plant.js              # 🌱 Plant entity
+│   ├── Plant.js              # 🌱 Plant entity (growth, fruiting)
+│   ├── Fence.js              # 🚧 Fence entity (tiling)
+│   └── Barrel.js             # 🛢️  Barrel entity (fermentation)
 ├── inventory/
 │   ├── InventoryManager.js   # 📦 Inventory logic
 │   ├── InventoryPanel.js     # 🎒 Inventory UI
@@ -251,8 +360,10 @@ js/
 │   ├── MenuManager.js        # 🔓 Menu unlocking
 │   └── ShopMenu.js           # 🏪 Shop UI
 ├── systems/
-│   ├── WorldInteractionManager.js  # 🖱️  Click handling
-│   └── PlantInfoPanel.js           # ℹ️  Plant info UI
+│   ├── WorldInteractionManager.js  # 🖱️  Click/drag handling
+│   ├── PlantInfoPanel.js           # ℹ️  Plant info UI (with fruit slots)
+│   ├── FenceInfoPanel.js           # 🚧 Fence info UI
+│   └── BarrelInfoPanel.js          # 🛢️  Barrel info UI (fermentation)
 └── main.js                   # 🚀 Initialization
 
 data/
@@ -275,10 +386,32 @@ data/
 - Viewport culling checks entity position before rendering
 
 ### Plant Growth Flow
-1. Seed placed → Plant entity created with `plantedAt` timestamp
+1. Seed placed → Plant entity created with `plantedAt` timestamp, stores `seedItemId` for seedling scale lookup
 2. `Plant.update()` checks `Date.now() - plantedAt`
-3. Transitions: sprout at `sproutTime`, mature at `sproutTime + maturityTime`
+3. Transitions: sprout at `sproutTime` (uses `seedlingScale`), mature at `sproutTime + maturityTime`
 4. Emoji changes automatically as `itemId` changes
+5. Mature fruiting plants schedule first fruit generation using `scheduleNextFruit()`
+
+### Fruiting Plant Flow
+1. Plant matures → checks `GameConfig.FRUITING.PLANTS[targetItemId]` for fruiting config
+2. If fruiting plant, schedules `nextFruitTime` with `baseTime ± timeVariance` randomization
+3. `Plant.update()` checks if `Date.now() >= nextFruitTime`
+4. `generateFruit()`: adds to `fruitSlot`, schedules next fruit if under `maxFruits`
+5. `getOverlayIcons()`: returns fruit icon positions based on `fruitSlot.count`
+6. User clicks plant → PlantInfoPanel shows fruit slot with count badge
+7. User takes fruit → `takeFruit()` returns all fruits, reschedules generation
+8. Harvest blocked if `hasFruit()` returns true
+
+### Fermentation Flow
+1. User clicks barrel → BarrelInfoPanel shows with input/output slots
+2. Click input slot → dropdown shows fermentable items OR selected item placed directly
+3. `barrel.placeInInput()`: stores items, calls `startFermentation()` to set timer
+4. `Barrel.update()`: checks progress via `getFermentationProgress()` (elapsed / time)
+5. When progress >= 1.0, `completeFermentation()`: moves one item from input to output
+6. If items remain in input, timer restarts for next item
+7. Output stacks up to `maxStackSize`, then fermentation pauses
+8. Click output slot → `takeFromOutput()` returns all output items
+9. Progress arrow UI updates every 100ms showing fill percentage
 
 ### Menu Unlock Flow
 1. Player earns money → `addMoney()` updates `peakMoney`
@@ -290,8 +423,39 @@ data/
 1. User clicks inventory slot → `InventoryPanel` emits selection
 2. Mouse move → `WorldInteractionManager` tracks position
 3. Renders placement preview if valid tile
-4. Click tile → validates, creates Plant, removes from inventory
-5. Selection persists if items remain, clears if slot empty
+4. Click/drag → validates, creates entity (Plant/Fence), removes from inventory
+5. Drag painting uses Set to prevent duplicate placements
+6. Selection persists across stacks if items remain, clears if empty
+
+### Tool Ownership System
+1. Tools are one-time purchases (stored in `player.ownedTools[]`)
+2. Shop displays checkmark ✅ and strikethrough for owned tools
+3. Purchase validation prevents repurchasing owned tools
+4. Plant harvesting checks tool ownership before allowing harvest
+5. Tool requirement failures show "Tool required" with lock emoji 🔒
+
+### Item Requirements System
+1. Items can specify `requirements` object (e.g. `{wood: 1}`)
+2. Shop validates both money and item requirements
+3. Temporary item removal checks inventory space after consumption
+4. Requirements displayed with hover tooltips showing item details
+5. Affordability styling updates dynamically based on inventory changes
+
+### Image-Based Items
+1. Items with `image` property use PNG assets instead of emoji
+2. AssetLoader preloads structure images (fence-horizontal.png, fence-vertical.png, barrel.png)
+3. Rendering logic checks for `item.image` before falling back to `item.emoji`
+4. Applies to: ShopMenu, InventoryPanel, ItemPreviewPanel, WorldInteractionManager
+5. Images use `object-fit: contain` for proper aspect ratio
+
+### Overlay Icon System
+1. Entities implement `getOverlayIcons()` returning array or null
+2. Each overlay config: `{itemId, offsetX, offsetY, scale}`
+3. Offset values are tile-relative: 0.0 = left/top edge, 1.0 = right/bottom edge
+4. Scale is relative to tile size: 0.33 = 33% of tile width/height
+5. Renderer calls `renderOverlayIcon()` for each overlay after entity render
+6. Used by Barrel (input/output slots at 0.1 and 0.57 X), Plant (fruits at custom positions)
+7. Overlay positions configured per entity type in GameConfig or entity class
 
 ## Debugging Tips
 
@@ -301,6 +465,15 @@ data/
 - **World not rendering**: Verify assets loaded, check camera position
 - **Save not working**: Check LocalStorage quota (5-10MB), verify save key
 - **Rivers look wrong**: Adjust `GameConfig.WORLD` parameters
+- **Entity clicks not working**: Verify coordinate flooring in click detection
+- **Panel not showing**: Check CSS uses class selectors (`.class`) not ID (`#id`) for shared styles
+- **Fence/Barrel image not rendering**: Verify image is in AssetLoader preload list
+- **Drag painting not working**: Ensure panning is disabled when item selected
+- **Fermentation not progressing**: Check recipe exists in GameConfig.FERMENTATION.RECIPES
+- **Fruit not generating**: Verify plant has `plantType: "fruiting"` and config in GameConfig.FRUITING.PLANTS
+- **Overlay icons misaligned**: Check offsetX/offsetY values (0-1 range, tile-relative)
+- **Panel refresh issues**: Ensure `buildPanel()` called once, `refresh()` updates content without recreating elements
+- **Barrel dropdown not working**: Check click event has `stopPropagation()` to prevent outside-click handler
 
 ### Console Commands
 ```javascript
@@ -322,12 +495,14 @@ game.chunkManager.getAllChunks();  // Inspect chunks
 ## Future Enhancement Ideas
 
 - NPCs/Animals using Entity base class
-- Building system on grass tiles
-- Crafting system combining resources
+- More building types and structures
+- Expanded crafting system combining resources
 - Day/night cycle with time system
 - Weather visual effects
 - More biomes (desert, forest, mountains)
 - Quest/achievement system
+- Additional fruiting plant types (apple trees, berry bushes, etc.)
+- More fermentation recipes and brewing mechanics
 
 ## Browser Compatibility
 

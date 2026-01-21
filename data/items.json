@@ -9,7 +9,8 @@
     "growsInto": "sunflower",
     "sproutTime": 10,
     "maturityTime": 20,
-    "overworldScale": 0.4
+    "overworldScale": 0.4,
+    "seedlingScale": 0.5
   },
   "sunflower": {
     "id": "sunflower",
@@ -18,6 +19,7 @@
     "description": "A bright yellow sunflower",
     "salePrice": 0.50,
     "itemType": "plant",
+    "plantType": "flower",
     "overworldScale": 0.5
   },
   "hyacinth_seed": {
@@ -30,7 +32,8 @@
     "growsInto": "hyacinth",
     "sproutTime": 60,
     "maturityTime": 120,
-    "overworldScale": 0.4
+    "overworldScale": 0.4,
+    "seedlingScale": 0.5
   },
   "hyacinth": {
     "id": "hyacinth",
@@ -39,6 +42,7 @@
     "description": "A beautiful purple hyacinth",
     "salePrice": 4.00,
     "itemType": "plant",
+    "plantType": "flower",
     "overworldScale": 0.5
   },
   "tulip_seed": {
@@ -50,8 +54,9 @@
     "itemType": "seed",
     "growsInto": "tulip",
     "sproutTime": 120,
-    "maturityTime": 240,
-    "overworldScale": 0.4
+    "maturityTime": 120,
+    "overworldScale": 0.4,
+    "seedlingScale": 0.5
   },
   "tulip": {
     "id": "tulip",
@@ -60,6 +65,7 @@
     "description": "A vibrant red tulip",
     "salePrice": 40.00,
     "itemType": "plant",
+    "plantType": "flower",
     "overworldScale": 0.5
   },
   "rose_seed": {
@@ -70,17 +76,19 @@
     "salePrice": 100.00,
     "itemType": "seed",
     "growsInto": "rose",
-    "sproutTime": 300,
-    "maturityTime": 600,
-    "overworldScale": 0.4
+    "sproutTime": 200,
+    "maturityTime": 300,
+    "overworldScale": 0.4,
+    "seedlingScale": 0.5
   },
   "rose": {
     "id": "rose",
     "name": "Rose",
     "emoji": "🌹",
     "description": "A beautiful red rose",
-    "salePrice": 250.00,
+    "salePrice": 200.00,
     "itemType": "plant",
+    "plantType": "flower",
     "overworldScale": 0.5
   },
   "tree_seed": {
@@ -88,20 +96,22 @@
     "name": "Tree Seed",
     "emoji": "🌰",
     "description": "Plant to grow a sturdy tree",
-    "salePrice": 0.50,
+    "salePrice": 250,
     "itemType": "seed",
     "growsInto": "tree",
-    "sproutTime": 30,
-    "maturityTime": 60,
-    "overworldScale": 0.3
+    "sproutTime": 300,
+    "maturityTime": 300,
+    "overworldScale": 0.3,
+    "seedlingScale": 0.8
   },
   "tree": {
     "id": "tree",
     "name": "Tree",
-    "emoji": "🌳",
-    "description": "A strong oak tree",
+    "emoji": "🌲",
+    "description": "A strong pine tree",
     "salePrice": 1.50,
     "itemType": "plant",
+    "plantType": "tree",
     "overworldScale": 1.2
   },
   "seedling": {
@@ -112,5 +122,152 @@
     "salePrice": 0,
     "itemType": "growth_stage",
     "overworldScale": 0.9
+  },
+  "wood": {
+    "id": "wood",
+    "name": "Wood",
+    "emoji": "🪵",
+    "description": "Lumber harvested from trees",
+    "salePrice": 100.00,
+    "itemType": "resource",
+    "overworldScale": 0.8
+  },
+  "axe": {
+    "id": "axe",
+    "name": "Axe",
+    "emoji": "🪓",
+    "description": "A tool for chopping down trees",
+    "salePrice": 1000.00,
+    "itemType": "tool",
+    "overworldScale": 0.7
+  },
+  "fence": {
+    "id": "fence",
+    "name": "Fence",
+    "image": "fence-horizontal.png",
+    "description": "A wooden fence for enclosing areas",
+    "salePrice": 200.00,
+    "itemType": "structure",
+    "requirements": {
+      "wood": 1
+    },
+    "overworldScale": 1.0
+  },
+  "barrel": {
+    "id": "barrel",
+    "name": "Barrel",
+    "image": "barrel.png",
+    "description": "A wooden barrel for fermentation",
+    "salePrice": 500.00,
+    "itemType": "structure",
+    "requirements": {
+      "wood": 5
+    },
+    "overworldScale": 1.0
+  },
+  "rice_seed": {
+    "id": "rice_seed",
+    "name": "Rice Seed",
+    "emoji": "🫘",
+    "description": "Plant to grow rice",
+    "salePrice": 500.00,
+    "itemType": "seed",
+    "growsInto": "rice",
+    "sproutTime": 80,
+    "maturityTime": 160,
+    "overworldScale": 0.4,
+    "seedlingScale": 0.5
+  },
+  "rice": {
+    "id": "rice",
+    "name": "Rice",
+    "emoji": "🌾",
+    "description": "Golden rice stalks",
+    "salePrice": 1000.00,
+    "itemType": "plant",
+    "plantType": "grain",
+    "overworldScale": 0.5
+  },
+  "sake": {
+    "id": "sake",
+    "name": "Sake",
+    "emoji": "🍶",
+    "description": "Fermented rice wine",
+    "salePrice": 1500.00,
+    "itemType": "resource",
+    "overworldScale": 0.7
+  },
+  "wheat_seed": {
+    "id": "wheat_seed",
+    "name": "Wheat Seed",
+    "emoji": "🫘",
+    "description": "Plant to grow wheat",
+    "salePrice": 1000.00,
+    "itemType": "seed",
+    "growsInto": "wheat",
+    "sproutTime": 80,
+    "maturityTime": 160,
+    "overworldScale": 0.4,
+    "seedlingScale": 0.5
+  },
+  "wheat": {
+    "id": "wheat",
+    "name": "Wheat",
+    "emoji": "🌾",
+    "description": "Amber waves of grain",
+    "salePrice": 2000.00,
+    "itemType": "plant",
+    "plantType": "grain",
+    "overworldScale": 0.5
+  },
+  "beer": {
+    "id": "beer",
+    "name": "Beer",
+    "emoji": "🍺",
+    "description": "Fermented wheat beverage",
+    "salePrice": 3000.00,
+    "itemType": "resource",
+    "overworldScale": 0.7
+  },
+  "grape_seed": {
+    "id": "grape_seed",
+    "name": "Grape Seed",
+    "emoji": "🫘",
+    "description": "Plant to grow a grapevine",
+    "salePrice": 3000.00,
+    "itemType": "seed",
+    "growsInto": "grape_vine",
+    "sproutTime": 200,
+    "maturityTime": 600,
+    "overworldScale": 0.4,
+    "seedlingScale": 0.6
+  },
+  "grape_vine": {
+    "id": "grape_vine",
+    "name": "Grapevine",
+    "emoji": "🌿",
+    "description": "A lush grapevine that produces fruit",
+    "salePrice": 100.00,
+    "itemType": "plant",
+    "plantType": "fruiting",
+    "overworldScale": 0.6
+  },
+  "grapes": {
+    "id": "grapes",
+    "name": "Grapes",
+    "emoji": "🍇",
+    "description": "Fresh grapes harvested from the vine",
+    "salePrice": 100.00,
+    "itemType": "resource",
+    "overworldScale": 0.6
+  },
+  "wine": {
+    "id": "wine",
+    "name": "Wine",
+    "emoji": "🍷",
+    "description": "Fermented grape wine",
+    "salePrice": 10000.00,
+    "itemType": "resource",
+    "overworldScale": 0.7
   }
 }
