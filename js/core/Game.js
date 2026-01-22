@@ -473,15 +473,14 @@ export class Game {
     }
 
     checkToolUnlocks() {
-        // Check if gloves should be unlocked (first time collecting fruit/barrel output)
-        if (this.player.hasCollectedOutput && !this.player.ownedTools.includes('gloves')) {
-            this.player.ownedTools.push('gloves');
-            console.log('Unlocked tool: Gloves');
+        // Check if gloves should be unlocked in shop (first time collecting fruit/barrel output)
+        if (this.player.hasCollectedOutput && !this.player.unlockedItems.includes('gloves')) {
+            this.player.unlockedItems.push('gloves');
+            console.log('Unlocked item in shop: Gloves');
 
-            // Refresh tools panel
-            if (this.toolsPanel) {
-                this.toolsPanel.refresh();
-                this.toolsPanel.notifyToolPurchased();
+            // Refresh shop menu to show newly unlocked item
+            if (this.shopMenu) {
+                this.shopMenu.refresh();
             }
         }
     }

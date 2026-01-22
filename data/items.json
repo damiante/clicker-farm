@@ -165,7 +165,7 @@
     "name": "Gloves",
     "emoji": "🧤",
     "description": "Paint-gather fruits and fermented items efficiently",
-    "salePrice": 8.00,
+    "salePrice": 5000.00,
     "itemType": "tool",
     "overworldScale": 0.7
   },
