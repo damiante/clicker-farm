@@ -4,13 +4,14 @@ import { BarrelInfoPanel } from './BarrelInfoPanel.js';
 import { GameConfig } from '../config/GameConfig.js';
 
 export class WorldInteractionManager {
-    constructor(game, renderer, inputManager, itemRegistry, inventoryManager, inventoryPanel) {
+    constructor(game, renderer, inputManager, itemRegistry, inventoryManager, inventoryPanel, toolsPanel) {
         this.game = game;
         this.renderer = renderer;
         this.inputManager = inputManager;
         this.itemRegistry = itemRegistry;
         this.inventoryManager = inventoryManager;
         this.inventoryPanel = inventoryPanel;
+        this.toolsPanel = toolsPanel;
         this.plantInfoPanel = new PlantInfoPanel(itemRegistry, game);
         this.fenceInfoPanel = new FenceInfoPanel(itemRegistry);
         this.barrelInfoPanel = new BarrelInfoPanel(itemRegistry);
@@ -31,14 +32,24 @@ export class WorldInteractionManager {
             this.paintedTiles.clear();
             this.justPlacedItem = false;
 
-            // If an item is selected, try to paint on pointer down
-            const selectedItem = this.inventoryPanel.getSelectedItem();
-            if (selectedItem) {
-                const worldPos = this.renderer.screenToWorld(event.position.x, event.position.y);
-                const tileX = worldPos.x;
-                const tileY = worldPos.y;
-                const tileKey = `${tileX},${tileY}`;
+            const worldPos = this.renderer.screenToWorld(event.position.x, event.position.y);
+            const tileX = worldPos.x;
+            const tileY = worldPos.y;
+            const tileKey = `${tileX},${tileY}`;
 
+            // Check for tool or item selection
+            const selectedTool = this.toolsPanel ? this.toolsPanel.getSelectedTool() : null;
+            const selectedItem = this.inventoryPanel.getSelectedItem();
+
+            // If a tool is selected, try to harvest on pointer down
+            if (selectedTool) {
+                if (this.tryHarvestWithTool(selectedTool, tileX, tileY)) {
+                    this.paintedTiles.add(tileKey);
+                    this.justPlacedItem = true;
+                }
+            }
+            // If an item is selected, try to place on pointer down
+            else if (selectedItem) {
                 if (this.tryPlaceItem(selectedItem.itemId, selectedItem.slotIndex, tileX, tileY)) {
                     this.paintedTiles.add(tileKey);
                     this.justPlacedItem = true;
@@ -61,18 +72,31 @@ export class WorldInteractionManager {
                     this.isDragging = true;
                 }
 
-                // If dragging and item selected, try to paint
-                const selectedItem = this.inventoryPanel.getSelectedItem();
-                if (this.isDragging && selectedItem) {
-                    const worldPos = this.renderer.screenToWorld(event.position.x, event.position.y);
-                    const tileX = worldPos.x;
-                    const tileY = worldPos.y;
-                    const tileKey = `${tileX},${tileY}`;
+                // If dragging, check for tool or item selection and paint
+                if (this.isDragging) {
+                    const selectedTool = this.toolsPanel ? this.toolsPanel.getSelectedTool() : null;
+                    const selectedItem = this.inventoryPanel.getSelectedItem();
 
-                    // Only paint if we haven't painted this tile yet in this drag
-                    if (!this.paintedTiles.has(tileKey)) {
-                        if (this.tryPlaceItem(selectedItem.itemId, selectedItem.slotIndex, tileX, tileY)) {
-                            this.paintedTiles.add(tileKey);
+                    if (selectedTool || selectedItem) {
+                        const worldPos = this.renderer.screenToWorld(event.position.x, event.position.y);
+                        const tileX = worldPos.x;
+                        const tileY = worldPos.y;
+                        const tileKey = `${tileX},${tileY}`;
+
+                        // Only paint if we haven't painted this tile yet in this drag
+                        if (!this.paintedTiles.has(tileKey)) {
+                            if (selectedTool) {
+                                // Tool-based harvesting
+                                if (this.tryHarvestWithTool(selectedTool, tileX, tileY)) {
+                                    this.paintedTiles.add(tileKey);
+                                    this.justPlacedItem = true;
+                                }
+                            } else if (selectedItem) {
+                                // Item placement
+                                if (this.tryPlaceItem(selectedItem.itemId, selectedItem.slotIndex, tileX, tileY)) {
+                                    this.paintedTiles.add(tileKey);
+                                }
+                            }
                         }
                     }
                 }
@@ -89,9 +113,10 @@ export class WorldInteractionManager {
             const distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < 5 && !this.isDragging) {
-                // Only handle click if no item selected and we didn't just place an item
+                // Only handle click if no tool/item selected and we didn't just place/harvest
+                const selectedTool = this.toolsPanel ? this.toolsPanel.getSelectedTool() : null;
                 const selectedItem = this.inventoryPanel.getSelectedItem();
-                if (!selectedItem && !this.justPlacedItem) {
+                if (!selectedTool && !selectedItem && !this.justPlacedItem) {
                     this.onCanvasClick(event.position.x, event.position.y);
                 }
             }
@@ -342,6 +367,12 @@ export class WorldInteractionManager {
         if (this.inventoryManager.hasRoomFor(taken.itemId)) {
             this.inventoryManager.addItem(taken.itemId, taken.count);
 
+            // Unlock gloves tool (first time collecting output)
+            if (!this.game.player.hasCollectedOutput) {
+                this.game.player.hasCollectedOutput = true;
+                this.game.checkToolUnlocks();
+            }
+
             // Notify about new item
             this.game.inventoryPanel.notifyItemAdded();
 
@@ -494,6 +525,146 @@ export class WorldInteractionManager {
         return true;
     }
 
+    tryHarvestWithTool(tool, tileX, tileY) {
+        // Silent version of harvest for drag painting with tools
+        // Returns true if harvest succeeded, false otherwise
+
+        // Ensure tile coordinates are integers
+        tileX = Math.floor(tileX);
+        tileY = Math.floor(tileY);
+
+        // Find entity at this tile position
+        const entity = this.game.entities.find(e =>
+            Math.floor(e.x) === tileX && Math.floor(e.y) === tileY
+        );
+
+        if (!entity) return false;
+
+        // Handle gloves tool for gathering fruits and fermented items
+        if (tool === 'gloves') {
+            // Check for fruiting plant with fruit
+            if (entity.type === 'plant' && entity.isFruitingPlant && entity.isFruitingPlant() && entity.hasFruit()) {
+                const fruit = entity.takeFruit();
+                if (!fruit) return false;
+
+                // Check if inventory has room
+                if (!this.inventoryManager.hasRoomFor(fruit.itemId)) {
+                    // Put fruit back
+                    entity.fruitSlot = fruit;
+                    return false;
+                }
+
+                // Add fruit to inventory
+                this.inventoryManager.addItem(fruit.itemId, fruit.count);
+
+                // Refresh UI
+                if (this.inventoryPanel.isVisible()) {
+                    this.inventoryPanel.refresh();
+                }
+                this.inventoryPanel.notifyItemAdded();
+                this.game.shopMenu.updateAffordability();
+                this.game.stateManager.scheduleSave(this.game.getGameState());
+
+                return true;
+            }
+
+            // Check for barrel with output
+            if (entity.type === 'barrel' && entity.outputSlot) {
+                const output = entity.takeFromOutput();
+                if (!output) return false;
+
+                // Check if inventory has room
+                if (!this.inventoryManager.hasRoomFor(output.itemId)) {
+                    // Put output back
+                    entity.outputSlot = output;
+                    return false;
+                }
+
+                // Add output to inventory
+                this.inventoryManager.addItem(output.itemId, output.count);
+
+                // Refresh UI
+                if (this.inventoryPanel.isVisible()) {
+                    this.inventoryPanel.refresh();
+                }
+                this.inventoryPanel.notifyItemAdded();
+                this.game.shopMenu.updateAffordability();
+                this.game.stateManager.scheduleSave(this.game.getGameState());
+
+                return true;
+            }
+
+            // Gloves tool doesn't work on anything else
+            return false;
+        }
+
+        // Must be a plant to harvest (for non-gloves tools)
+        if (entity.type !== 'plant') return false;
+
+        const plant = entity;
+
+        // Must be mature
+        if (!plant.canHarvest()) return false;
+
+        // Must take fruit first (if fruiting plant)
+        if (plant.hasFruit()) return false;
+
+        // Validate correct tool for plant type
+        const targetItem = this.itemRegistry.getItem(plant.targetItemId);
+        if (!targetItem) return false;
+
+        // Handle scissors (flowers/grains)
+        if (tool === 'scissors') {
+            // Scissors only work on flowers and grains
+            if (targetItem.plantType !== 'flower' && targetItem.plantType !== 'grain') {
+                return false;
+            }
+        }
+        // Handle saw (trees only)
+        else if (tool === 'saw') {
+            // Saw only works on trees
+            if (targetItem.plantType !== 'tree') {
+                return false;
+            }
+        }
+        // Unknown tool
+        else {
+            return false;
+        }
+
+        // Perform harvest
+        const harvestedItemId = plant.harvest(this.itemRegistry);
+
+        // Add to inventory
+        if (!this.inventoryManager.hasRoomFor(harvestedItemId)) {
+            return false; // Inventory full
+        }
+
+        this.inventoryManager.addItem(harvestedItemId, 1);
+
+        // Remove plant entity
+        const index = this.game.entities.indexOf(plant);
+        if (index > -1) {
+            this.game.entities.splice(index, 1);
+        }
+
+        // Refresh inventory panel if visible
+        if (this.inventoryPanel.isVisible()) {
+            this.inventoryPanel.refresh();
+        }
+
+        // Notify inventory about new item
+        this.inventoryPanel.notifyItemAdded();
+
+        // Update shop affordability
+        this.game.shopMenu.updateAffordability();
+
+        // Save state
+        this.game.stateManager.scheduleSave(this.game.getGameState());
+
+        return true;
+    }
+
     placeItemOnTile(itemId, slotIndex, tileX, tileY) {
         const item = this.itemRegistry.getItem(itemId);
         if (!item) {
@@ -625,6 +796,12 @@ export class WorldInteractionManager {
         // Add to inventory
         if (this.inventoryManager.hasRoomFor(taken.itemId)) {
             this.inventoryManager.addItem(taken.itemId, taken.count);
+
+            // Unlock gloves tool (first time collecting output)
+            if (!this.game.player.hasCollectedOutput) {
+                this.game.player.hasCollectedOutput = true;
+                this.game.checkToolUnlocks();
+            }
 
             // Notify about new item
             this.game.inventoryPanel.notifyItemAdded();

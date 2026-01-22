@@ -96,7 +96,7 @@
     "name": "Tree Seed",
     "emoji": "🌰",
     "description": "Plant to grow a sturdy tree",
-    "salePrice": 50,
+    "salePrice": 20,
     "itemType": "seed",
     "growsInto": "tree",
     "sproutTime": 300,
@@ -132,12 +132,40 @@
     "itemType": "resource",
     "overworldScale": 0.8
   },
+  "scissors": {
+    "id": "scissors",
+    "name": "Scissors",
+    "emoji": "✂️",
+    "description": "Paint-harvest flowers and grains efficiently",
+    "salePrice": 50.00,
+    "itemType": "tool",
+    "overworldScale": 0.7
+  },
   "axe": {
     "id": "axe",
     "name": "Axe",
     "emoji": "🪓",
-    "description": "A tool for chopping down trees",
-    "salePrice": 25.00,
+    "description": "Required to harvest trees",
+    "salePrice": 10.00,
+    "itemType": "tool",
+    "overworldScale": 0.7
+  },
+  "saw": {
+    "id": "saw",
+    "name": "Saw",
+    "emoji": "🪚",
+    "description": "Paint-harvest trees efficiently",
+    "salePrice": 1500.00,
+    "itemType": "tool",
+    "toolPrerequisite": "axe",
+    "overworldScale": 0.7
+  },
+  "gloves": {
+    "id": "gloves",
+    "name": "Gloves",
+    "emoji": "🧤",
+    "description": "Paint-gather fruits and fermented items efficiently",
+    "salePrice": 8.00,
     "itemType": "tool",
     "overworldScale": 0.7
   },

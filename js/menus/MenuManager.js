@@ -98,7 +98,23 @@ export class MenuManager {
         const menu = this.getMenu(menuId);
         if (!menu) return [];
 
-        return menu.items.filter(itemId => this.isItemUnlocked(itemId));
+        return menu.items.filter(itemId => {
+            // Item must be unlocked by price
+            if (!this.isItemUnlocked(itemId)) {
+                return false;
+            }
+
+            // Check tool prerequisites
+            const item = this.itemRegistry.getItem(itemId);
+            if (item && item.toolPrerequisite) {
+                // Player must own the prerequisite tool
+                if (!this.game.player.ownedTools || !this.game.player.ownedTools.includes(item.toolPrerequisite)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
     }
 
     getMenu(menuId) {

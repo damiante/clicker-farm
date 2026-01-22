@@ -264,6 +264,12 @@ export class ShopMenu {
             }
             this.game.player.ownedTools.push(item.id);
             console.log(`Unlocked tool: ${item.name}`);
+
+            // Refresh tools panel and notify user
+            if (this.game.toolsPanel) {
+                this.game.toolsPanel.refresh();
+                this.game.toolsPanel.notifyToolPurchased();
+            }
         } else {
             // Add to inventory (non-tools)
             if (this.inventoryManager.addItem(item.id)) {

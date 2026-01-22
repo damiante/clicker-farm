@@ -76,13 +76,15 @@ This document provides architectural guidance for developers and AI agents worki
 **Location**: `js/items/`, `data/items.json`
 
 - **ItemRegistry.js**: Loads and caches item data from JSON
-- **items.json**: Item definitions with emoji/image, prices, growth times, scaling, requirements
+- **items.json**: Item definitions with emoji/image, prices, growth times, scaling, requirements, tool prerequisites
 - Item types: seed, plant, growth_stage, tool, structure, resource
 - `overworldScale` property controls rendering size (default: 1.0)
 - `seedlingScale` property controls seedling-stage rendering size (allows different sizes per plant type)
 - Image-based items (e.g. fences, barrels) use `image` property instead of `emoji`
 - Items can have `requirements` (e.g. fence requires wood, barrel requires wood)
+- Items can have `toolPrerequisite` (e.g. saw requires axe to be owned before appearing in shop)
 - Tools are one-time purchases stored in `player.ownedTools`
+- **Tool types**: Requirement tools (axe - enables harvest button only) vs Paint tools (scissors, saw, gloves - appear in ToolsPanel for drag-harvesting)
 
 ### Plant Growth
 **Location**: `js/entities/Plant.js`
@@ -144,7 +146,11 @@ This document provides architectural guidance for developers and AI agents worki
 - Click detection: pointerdown → pointerup with minimal drag distance
 - Placement: validates tile type (grass only), checks for existing entities
 - Harvesting: click mature plants to add to inventory, validates tool ownership
-- Drag painting: hold and drag to paint multiple tiles with selected item
+- **Tool-based harvesting**: `tryHarvestWithTool()` enables paint-harvesting with selected tools
+  - Scissors: harvest flowers/grains by drag-painting
+  - Saw: harvest trees by drag-painting (requires axe owned)
+  - Gloves: gather fruits/barrel outputs by drag-painting
+- Drag painting: hold and drag to paint multiple tiles with selected item or tool
 - Set-based duplicate prevention: `paintedTiles` tracks painted tiles per drag
 - Selection persistence: continues across multiple stacks of same item
 - Placement preview: translucent emoji/image (40% opacity) on hover
@@ -158,8 +164,13 @@ This document provides architectural guidance for developers and AI agents worki
 - **Button.js**: Themed button component with `setText()` and `setEnabled()` methods
 - **UIManager.js**: Orchestrates UI creation and updates
 - **SettingsMenu.js**: Grid toggle and reset functionality
+- **ToolsPanel.js**: Bottom-center always-visible panel for paint tools
+  - Filters to show only paint tools (scissors, saw, gloves) not requirement tools (axe)
+  - Toggle selection for drag-painting, mutually exclusive with inventory selection
+  - Refreshes when tools purchased/unlocked
 - **PlantInfoPanel.js**: Floating panel for plant status
   - Dynamic harvest emoji (🪓 for trees, ✂️ for flowers/grains)
+  - Harvest button checks axe ownership for trees
   - Fruit slot display for fruiting plants with "Take" button (🫴 emoji)
   - Harvest button disabled when fruit present ("Take fruit first" message)
   - Panel refresh pattern: separate `buildPanel()` (once) and `refresh()` (frequent) to preserve event listeners
@@ -167,7 +178,7 @@ This document provides architectural guidance for developers and AI agents worki
 - **BarrelInfoPanel.js**: Floating panel for barrel interaction
   - Two-slot layout (input/output) with progress arrow between them
   - Click input slot to show dropdown or place selected item
-  - Click output slot to take fermented products
+  - Click output slot to take fermented products (triggers gloves unlock on first collection)
   - Dropdown auto-refreshes when inventory changes
   - Progress bar fills left-to-right showing fermentation progress
 - All components consume UITheme.js for consistent styling
@@ -189,8 +200,9 @@ Main orchestrator:
 - `start()`: Begin requestAnimationFrame loop
 - `update(deltaTime)`: Update entities
 - `render()`: Render world → entities → grid → placement preview → UI
-- Central methods: `addMoney()`, `expandWorld()`, `createPlantEntity()`, `createFenceEntity()`
+- Central methods: `addMoney()`, `expandWorld()`, `createPlantEntity()`, `createFenceEntity()`, `checkToolUnlocks()`
 - `updateFenceOrientations()`: Updates all fence tiling after fence add/remove
+- `checkToolUnlocks()`: Checks unlock conditions (e.g., hasCollectedOutput) and adds tools to ownedTools
 - Panning disabled when item selected for placement
 
 ## Configuration Files
@@ -214,10 +226,10 @@ Key sections:
 **Inventory pricing formulas** - slot/stack costs, growth rates, limits
 
 ### items.json
-**Item definitions** - id, name, emoji, prices, growth times, scaling
+**Item definitions** - id, name, emoji/image, prices, growth times, scaling, requirements, toolPrerequisite
 
 ### menus.json
-**Shop menu structure** - menu id, name, emoji, item lists
+**Shop menu structure** - menu id, name, emoji, item lists (note: gloves NOT in Tools menu, unlocked conditionally)
 
 ## State Schema
 
@@ -234,7 +246,9 @@ Key sections:
     inventorySlotsPrice: 10,
     stackSizePrice: 20,
     unlockedMenus: [],
-    ownedTools: ['axe'],  // One-time tool purchases
+    unlockedItems: [],
+    ownedTools: [],  // One-time tool purchases (axe, scissors, saw) + conditionally unlocked (gloves)
+    hasCollectedOutput: false,  // Triggers gloves unlock on first fruit/barrel output collection
     expansionCount: 0
   },
   settings: {
@@ -286,6 +300,19 @@ Key sections:
    ```
 3. Optionally add fermentation recipe if fruit can be fermented
 4. Test: plant seed, wait for maturity, verify fruit generation and overlay display
+
+### Add a Tool
+1. Add definition to `data/items.json` with `itemType: "tool"`
+2. Decide tool category:
+   - **Paint tool** (drag-harvesting): Add to `ToolsPanel.js` paintTools filter array
+   - **Requirement tool** (enables buttons): Tool NOT added to paintTools filter
+3. For shop-purchasable tools: Add to `data/menus.json` Tools menu
+4. For conditionally unlocked tools:
+   - Add unlock condition check (e.g., `hasCollectedOutput`)
+   - Add unlock logic to `Game.checkToolUnlocks()`
+   - Add trigger in appropriate WorldInteractionManager method
+5. For tool prerequisites: Add `toolPrerequisite: "prerequisite_tool_id"` field
+6. Update `Plant.canHarvestWithTool()` or `WorldInteractionManager.tryHarvestWithTool()` if needed
 
 ### Add a New Entity Type
 1. Create class extending Entity in `js/entities/`
@@ -344,6 +371,7 @@ js/
 │   ├── Modal.js              # 📦 Reusable modal
 │   ├── Button.js             # 🔘 Reusable button
 │   ├── MoneyDisplay.js       # 💵 Money counter
+│   ├── ToolsPanel.js         # 🔧 Paint tools panel (bottom-center)
 │   └── SettingsMenu.js       # ⚙️  Settings modal
 ├── entities/
 │   ├── Entity.js             # 🧬 Base entity class
@@ -427,12 +455,24 @@ data/
 5. Drag painting uses Set to prevent duplicate placements
 6. Selection persists across stacks if items remain, clears if empty
 
-### Tool Ownership System
-1. Tools are one-time purchases (stored in `player.ownedTools[]`)
-2. Shop displays checkmark ✅ and strikethrough for owned tools
-3. Purchase validation prevents repurchasing owned tools
-4. Plant harvesting checks tool ownership before allowing harvest
-5. Tool requirement failures show "Tool required" with lock emoji 🔒
+### Tool System Flow
+1. **Tool Categories**:
+   - Requirement tools (axe): Enable harvest button in info panels, NOT selectable for drag-painting
+   - Paint tools (scissors, saw, gloves): Appear in ToolsPanel for efficient drag-harvesting
+2. **Shop Purchase** (scissors, axe, saw):
+   - Purchase from Tools menu in shop (gloves NOT in shop, unlocked conditionally)
+   - Stored in `player.ownedTools[]`, displayed with checkmark ✅ and strikethrough
+   - Tool prerequisites checked via `MenuManager.getUnlockedItemsForMenu()` (saw requires axe owned)
+3. **Conditional Unlock** (gloves):
+   - First fruit/barrel output collection sets `player.hasCollectedOutput = true`
+   - `Game.checkToolUnlocks()` adds gloves to `ownedTools`
+   - ToolsPanel refreshes to show newly unlocked tool
+4. **ToolsPanel Filtering**:
+   - Only displays paint tools (scissors, saw, gloves), filters out requirement tools (axe)
+   - Selection mutually exclusive with inventory selection
+5. **Harvesting Logic**:
+   - Info panel harvest button: checks `requiresTool()` and axe ownership
+   - Paint-harvesting: `tryHarvestWithTool()` validates tool type vs entity type
 
 ### Item Requirements System
 1. Items can specify `requirements` object (e.g. `{wood: 1}`)
@@ -475,13 +515,6 @@ data/
 - **Panel refresh issues**: Ensure `buildPanel()` called once, `refresh()` updates content without recreating elements
 - **Barrel dropdown not working**: Check click event has `stopPropagation()` to prevent outside-click handler
 
-### Console Commands
-```javascript
-game.player.money = 1000;          // Add money
-game.expandWorld(buttonData);      // Force expansion
-game.stateManager.reset();         // Clear save
-game.chunkManager.getAllChunks();  // Inspect chunks
-```
 
 ## Performance Notes
 
@@ -491,25 +524,3 @@ game.chunkManager.getAllChunks();  // Inspect chunks
 - Run-length encoding compresses tile data
 - Auto-save throttling (500ms debounce)
 - RequestAnimationFrame for native 60fps
-
-## Future Enhancement Ideas
-
-- NPCs/Animals using Entity base class
-- More building types and structures
-- Expanded crafting system combining resources
-- Day/night cycle with time system
-- Weather visual effects
-- More biomes (desert, forest, mountains)
-- Quest/achievement system
-- Additional fruiting plant types (apple trees, berry bushes, etc.)
-- More fermentation recipes and brewing mechanics
-
-## Browser Compatibility
-
-Requires:
-- ES6 modules
-- LocalStorage API
-- Canvas 2D context
-- PointerEvent API
-
-Tested: Chrome/Edge/Firefox/Safari (latest versions)

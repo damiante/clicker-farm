@@ -9,6 +9,7 @@ import { UIManager } from '../ui/UIManager.js';
 import { ItemRegistry } from '../items/ItemRegistry.js';
 import { InventoryManager } from '../inventory/InventoryManager.js';
 import { InventoryPanel } from '../inventory/InventoryPanel.js';
+import { ToolsPanel } from '../ui/ToolsPanel.js';
 import { MenuManager } from '../menus/MenuManager.js';
 import { ShopMenu } from '../menus/ShopMenu.js';
 import { DragDropManager } from '../systems/DragDropManager.js';
@@ -29,6 +30,7 @@ export class Game {
         this.itemRegistry = null;
         this.inventoryManager = null;
         this.inventoryPanel = null;
+        this.toolsPanel = null;
         this.menuManager = null;
         this.shopMenu = null;
         this.dragDropManager = null;
@@ -44,9 +46,10 @@ export class Game {
             stackSizePrice: InventoryConfig.STACK_BASE_PRICE,
             unlockedMenus: [],
             unlockedItems: [],
-            ownedTools: [],  // Track purchased tools (one-time unlocks)
+            ownedTools: [],  // Track purchased tools
             expansionCount: 0,  // Track number of world expansions
-            inventoryNotification: false  // Track unviewed inventory changes
+            inventoryNotification: false,  // Track unviewed inventory changes
+            hasCollectedOutput: false  // Track if player has collected fruit/barrel output
         };
 
         this.settings = {
@@ -79,6 +82,7 @@ export class Game {
         // Initialize inventory system
         this.inventoryManager = new InventoryManager(this, this.itemRegistry);
         this.inventoryPanel = new InventoryPanel(this.inventoryManager, this.itemRegistry, this);
+        this.toolsPanel = new ToolsPanel(this, this.itemRegistry);
 
         // Initialize shop menu
         this.shopMenu = new ShopMenu(this.menuManager, this.inventoryManager, this.itemRegistry, this);
@@ -99,7 +103,8 @@ export class Game {
             this.inputManager,
             this.itemRegistry,
             this.inventoryManager,
-            this.inventoryPanel
+            this.inventoryPanel,
+            this.toolsPanel
         );
 
         // Setup input listeners
@@ -110,8 +115,11 @@ export class Game {
         });
 
         this.inputManager.on('pan', (event) => {
-            // Don't pan if an item is selected for placement
+            // Don't pan if an item or tool is selected
             if (this.inventoryPanel && this.inventoryPanel.getSelectedItem()) {
+                return;
+            }
+            if (this.toolsPanel && this.toolsPanel.getSelectedTool()) {
                 return;
             }
             this.renderer.pan(event.deltaX, event.deltaY);
@@ -148,8 +156,10 @@ export class Game {
         this.player.maxStackSize = InventoryConfig.INITIAL_STACK_SIZE;
         this.player.unlockedMenus = [];
         this.player.unlockedItems = [];
+        this.player.ownedTools = [];
         this.player.expansionCount = 0;
         this.player.inventoryNotification = false;
+        this.player.hasCollectedOutput = false;
 
         // Initialize inventory
         this.inventoryManager.deserialize(this.player);
@@ -176,6 +186,7 @@ export class Game {
         this.player.ownedTools = state.player.ownedTools || [];
         this.player.expansionCount = state.player.expansionCount || 0;
         this.player.inventoryNotification = state.player.inventoryNotification || false;
+        this.player.hasCollectedOutput = state.player.hasCollectedOutput || false;
 
         // Restore settings
         if (state.settings) {
@@ -191,9 +202,18 @@ export class Game {
             this.inventoryPanel.restoreNotification();
         }
 
+        // Restore tools panel and selected tool
+        this.toolsPanel.refresh();
+        if (state.player.selectedTool) {
+            this.toolsPanel.selectTool(state.player.selectedTool);
+        }
+
         // Check for menu and item unlocks based on loaded peakMoney
         this.menuManager.checkUnlocks();
         this.menuManager.checkItemUnlocks();
+
+        // Check for tool unlocks based on conditions
+        this.checkToolUnlocks();
 
         // Restore menus
         this.shopMenu.refresh();
@@ -259,7 +279,9 @@ export class Game {
                 unlockedItems: this.player.unlockedItems,
                 ownedTools: this.player.ownedTools,
                 expansionCount: this.player.expansionCount,
-                inventoryNotification: this.player.inventoryNotification
+                inventoryNotification: this.player.inventoryNotification,
+                selectedTool: this.toolsPanel ? this.toolsPanel.getSelectedTool() : null,
+                hasCollectedOutput: this.player.hasCollectedOutput
             },
             settings: this.settings,
             world: this.chunkManager.serialize(),
@@ -450,6 +472,20 @@ export class Game {
         }
     }
 
+    checkToolUnlocks() {
+        // Check if gloves should be unlocked (first time collecting fruit/barrel output)
+        if (this.player.hasCollectedOutput && !this.player.ownedTools.includes('gloves')) {
+            this.player.ownedTools.push('gloves');
+            console.log('Unlocked tool: Gloves');
+
+            // Refresh tools panel
+            if (this.toolsPanel) {
+                this.toolsPanel.refresh();
+                this.toolsPanel.notifyToolPurchased();
+            }
+        }
+    }
+
     removeEntity(entity) {
         const index = this.entities.indexOf(entity);
         if (index > -1) {
@@ -467,6 +503,12 @@ export class Game {
         this.entities = [];
 
         this.startNewGame();
+
+        // Refresh tools panel to show cleared state
+        if (this.toolsPanel) {
+            this.toolsPanel.clearSelection();
+            this.toolsPanel.refresh();
+        }
 
         this.stateManager.scheduleSave(this.getGameState());
 

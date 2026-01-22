@@ -9,7 +9,7 @@
     "id": "tools",
     "name": "Tools",
     "emoji": "🛠️",
-    "items": ["axe"]
+    "items": ["scissors", "axe", "saw"]
   },
   {
     "id": "structures",

@@ -181,6 +181,11 @@ export class InventoryPanel {
         } else {
             this.selectedSlotIndex = index;
 
+            // Clear tool selection when item is selected
+            if (this.game.toolsPanel) {
+                this.game.toolsPanel.clearSelection();
+            }
+
             // Sell callback - removes 1 item and adds money
             const onSell = () => {
                 const item = this.itemRegistry.getItem(slot.itemId);

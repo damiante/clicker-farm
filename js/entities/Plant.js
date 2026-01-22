@@ -215,6 +215,20 @@ export class Plant extends Entity {
         return null;
     }
 
+    canHarvestWithTool(tool, itemRegistry) {
+        // Check if the given tool can be used to harvest this plant
+        const targetItem = itemRegistry.getItem(this.targetItemId);
+        if (!targetItem) return false;
+
+        if (tool === 'scissors') {
+            return targetItem.plantType === 'flower' || targetItem.plantType === 'grain';
+        } else if (tool === 'saw') {
+            return targetItem.plantType === 'tree';
+        }
+
+        return false;
+    }
+
     getGrowthDescription(itemRegistry) {
         const targetItem = itemRegistry.getItem(this.targetItemId);
         const targetName = targetItem ? targetItem.name : 'unknown';
