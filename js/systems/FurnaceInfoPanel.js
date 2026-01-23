@@ -1,10 +1,14 @@
 import { Button } from '../ui/Button.js';
 import { Modal } from '../ui/Modal.js';
-import { GameConfig } from '../config/GameConfig.js';
+import { ItemSlot } from '../ui/ItemSlot.js';
+import { ProgressArrow } from '../ui/ProgressArrow.js';
+import { ItemDropdown } from '../ui/ItemDropdown.js';
+import { UIComponentTheme } from '../config/UIComponentTheme.js';
 
 export class FurnaceInfoPanel {
-    constructor(itemRegistry) {
+    constructor(itemRegistry, assetLoader) {
         this.itemRegistry = itemRegistry;
+        this.assetLoader = assetLoader;
         this.panel = null;
         this.visible = false;
         this.currentFurnace = null;
@@ -13,8 +17,16 @@ export class FurnaceInfoPanel {
         this.onFuelSlotClickCallback = null;
         this.onOutputSlotClickCallback = null;
         this.refreshInterval = null;
+        this.inventoryManager = null;
+
+        // Component instances
+        this.smeltSlot = null;
+        this.fuelSlot = null;
+        this.outputSlot = null;
+        this.progressArrow = null;
         this.smeltDropdown = null;
         this.fuelDropdown = null;
+
         this.createPanel();
     }
 
@@ -29,6 +41,10 @@ export class FurnaceInfoPanel {
             if (!this.visible) return;
             if (this.panel.contains(e.target)) return;
 
+            // Don't close if clicking on dropdown
+            if (this.smeltDropdown && this.smeltDropdown.element && this.smeltDropdown.element.contains(e.target)) return;
+            if (this.fuelDropdown && this.fuelDropdown.element && this.fuelDropdown.element.contains(e.target)) return;
+
             // Don't close if clicking on the inventory panel
             const inventoryPanel = document.getElementById('inventory-panel');
             if (inventoryPanel && inventoryPanel.contains(e.target)) return;
@@ -37,12 +53,13 @@ export class FurnaceInfoPanel {
         });
     }
 
-    show(furnace, screenX, screenY, onDestroy, onSmeltSlotClick, onFuelSlotClick, onOutputSlotClick) {
+    show(furnace, screenX, screenY, onDestroy, onSmeltSlotClick, onFuelSlotClick, onOutputSlotClick, inventoryManager) {
         this.currentFurnace = furnace;
         this.onDestroyCallback = onDestroy;
         this.onSmeltSlotClickCallback = onSmeltSlotClick;
         this.onFuelSlotClickCallback = onFuelSlotClick;
         this.onOutputSlotClickCallback = onOutputSlotClick;
+        this.inventoryManager = inventoryManager;
 
         const item = this.itemRegistry.getItem(furnace.itemId);
         if (!item) {
@@ -99,7 +116,7 @@ export class FurnaceInfoPanel {
         this.panel.appendChild(name);
         this.panel.appendChild(description);
 
-        // Furnace slots
+        // Furnace slots using new components
         const slotsContainer = document.createElement('div');
         slotsContainer.className = 'furnace-slots';
         slotsContainer.style.cssText = `
@@ -118,48 +135,59 @@ export class FurnaceInfoPanel {
             gap: 5px;
         `;
 
-        // Smelt slot (top)
-        const smeltSlot = this.createSlot(furnace.smeltSlot, false);
-        smeltSlot.title = 'Smelt slot - Click to add smeltable items';
-        smeltSlot.addEventListener('pointerdown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (this.onSmeltSlotClickCallback) {
-                this.onSmeltSlotClickCallback(this.currentFurnace);
+        // Smelt slot (top) - using ItemSlot component
+        this.smeltSlot = new ItemSlot('small', furnace.smeltSlot, this.itemRegistry, this.assetLoader, {
+            isOutput: false,
+            clickable: true,
+            onSlotClick: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (this.onSmeltSlotClickCallback) {
+                    this.onSmeltSlotClickCallback(this.currentFurnace);
+                }
             }
         });
+        this.smeltSlot.getElement().title = 'Smelt slot - Click to add/remove items';
 
-        // Fuel slot (bottom)
-        const fuelSlot = this.createSlot(furnace.fuelSlot, false);
-        fuelSlot.title = 'Fuel slot - Click to add fuel';
-        fuelSlot.addEventListener('pointerdown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (this.onFuelSlotClickCallback) {
-                this.onFuelSlotClickCallback(this.currentFurnace);
+        // Fuel slot (bottom) - using ItemSlot component
+        this.fuelSlot = new ItemSlot('small', furnace.fuelSlot, this.itemRegistry, this.assetLoader, {
+            isOutput: false,
+            clickable: true,
+            onSlotClick: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (this.onFuelSlotClickCallback) {
+                    this.onFuelSlotClickCallback(this.currentFurnace);
+                }
             }
         });
+        this.fuelSlot.getElement().title = 'Fuel slot - Click to add/remove fuel';
 
-        inputSlotsContainer.appendChild(smeltSlot);
-        inputSlotsContainer.appendChild(fuelSlot);
+        inputSlotsContainer.appendChild(this.smeltSlot.getElement());
+        inputSlotsContainer.appendChild(this.fuelSlot.getElement());
 
-        // Arrow with progress fill
-        const arrow = this.createProgressArrow(furnace.getSmeltingProgress());
+        // Progress arrow - using ProgressArrow component
+        this.progressArrow = new ProgressArrow(furnace.getSmeltingProgress(), {
+            color: UIComponentTheme.PROGRESS.ARROW.COLORS.FURNACE
+        });
 
-        // Output slot (right)
-        const outputSlot = this.createSlot(furnace.outputSlot, true);
-        outputSlot.title = 'Output slot - Click to take items';
-        outputSlot.addEventListener('pointerdown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (this.onOutputSlotClickCallback && this.currentFurnace.outputSlot) {
-                this.onOutputSlotClickCallback(this.currentFurnace);
+        // Output slot (right) - using ItemSlot component
+        this.outputSlot = new ItemSlot('small', furnace.outputSlot, this.itemRegistry, this.assetLoader, {
+            isOutput: true,
+            clickable: true,
+            onSlotClick: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (this.onOutputSlotClickCallback && this.currentFurnace.outputSlot) {
+                    this.onOutputSlotClickCallback(this.currentFurnace);
+                }
             }
         });
+        this.outputSlot.getElement().title = 'Output slot - Click to take items';
 
         slotsContainer.appendChild(inputSlotsContainer);
-        slotsContainer.appendChild(arrow);
-        slotsContainer.appendChild(outputSlot);
+        slotsContainer.appendChild(this.progressArrow.getElement());
+        slotsContainer.appendChild(this.outputSlot.getElement());
 
         this.panel.appendChild(slotsContainer);
 
@@ -168,138 +196,105 @@ export class FurnaceInfoPanel {
         const destroyBtn = new Button(
             'Destroy',
             '💥',
-            isSmelting ? null : () => this.showDestroyConfirmation(),
+            isSmelting ? null : () => {
+                if (this.onDestroyCallback) {
+                    this.onDestroyCallback(this.currentFurnace);
+                }
+                this.hide();
+            },
             isSmelting ? 'disabled' : 'danger'
         );
+        destroyBtn.getElement().style.width = UIComponentTheme.PANEL.BUTTON.WIDTH;
 
         if (isSmelting) {
             destroyBtn.getElement().title = 'Cannot destroy while smelting';
         }
 
-        // Create button container for centering
+        // Create button container
         const buttonContainer = document.createElement('div');
         buttonContainer.className = 'plant-info-buttons';
         buttonContainer.appendChild(destroyBtn.getElement());
         this.panel.appendChild(buttonContainer);
     }
 
-    createSlot(slotData, isOutput) {
-        const slot = document.createElement('div');
-        slot.className = 'barrel-slot';
-        slot.style.cssText = `
-            width: 50px;
-            height: 50px;
-            border: 2px solid #444;
-            border-radius: 4px;
-            background-color: ${isOutput ? '#333' : '#222'};
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            cursor: pointer;
-        `;
+    refresh() {
+        if (!this.visible || !this.currentFurnace) return;
 
-        if (slotData) {
-            const slotItem = this.itemRegistry.getItem(slotData.itemId);
-            if (slotItem) {
-                if (slotItem.image) {
-                    const img = document.createElement('img');
-                    img.src = `./assets/${slotItem.image}`;
-                    img.alt = slotItem.name;
-                    img.style.width = '40px';
-                    img.style.height = '40px';
-                    img.style.objectFit = 'contain';
-                    slot.appendChild(img);
-                } else {
-                    slot.textContent = slotItem.emoji;
-                    slot.style.fontSize = '30px';
-                }
+        const furnace = this.currentFurnace;
 
-                // Add count badge
-                if (slotData.count > 1) {
-                    const countBadge = document.createElement('div');
-                    countBadge.className = 'count-badge';
-                    countBadge.textContent = slotData.count;
-                    countBadge.style.cssText = `
-                        position: absolute;
-                        bottom: 2px;
-                        right: 2px;
-                        background-color: #000;
-                        color: #fff;
-                        border-radius: 8px;
-                        padding: 2px 5px;
-                        font-size: 10px;
-                        font-weight: bold;
-                    `;
-                    slot.appendChild(countBadge);
-                }
-            }
+        // Update slot contents using ItemSlot.updateContents()
+        if (this.smeltSlot) {
+            this.smeltSlot.updateContents(furnace.smeltSlot);
         }
 
-        return slot;
+        if (this.fuelSlot) {
+            this.fuelSlot.updateContents(furnace.fuelSlot);
+        }
+
+        if (this.outputSlot) {
+            this.outputSlot.updateContents(furnace.outputSlot);
+        }
+
+        // Update progress arrow using ProgressArrow.updateProgress()
+        if (this.progressArrow) {
+            this.progressArrow.updateProgress(furnace.getSmeltingProgress());
+        }
     }
 
-    createProgressArrow(progress) {
-        const arrow = document.createElement('div');
-        arrow.style.cssText = `
-            width: 40px;
-            height: 50px;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
+    showSmeltDropdown(onSelect) {
+        this.hideSmeltDropdown();
 
-        // Arrow background
-        const arrowBg = document.createElement('div');
-        arrowBg.textContent = '→';
-        arrowBg.style.cssText = `
-            font-size: 30px;
-            color: #444;
-            position: absolute;
-        `;
+        if (!this.inventoryManager || !this.smeltSlot) return;
 
-        // Arrow fill (shows progress)
-        const arrowFill = document.createElement('div');
-        arrowFill.textContent = '→';
-        arrowFill.style.cssText = `
-            font-size: 30px;
-            color: #ff6600;
-            position: absolute;
-            clip-path: inset(0 ${100 - progress * 100}% 0 0);
-            transition: clip-path 0.1s;
-        `;
-
-        arrow.appendChild(arrowBg);
-        arrow.appendChild(arrowFill);
-
-        return arrow;
-    }
-
-    showDestroyConfirmation() {
-        const modal = new Modal();
-        modal.setTitle('Destroy Furnace?');
-        modal.setMessage('Are you sure? All materials will be lost.');
-
-        const confirmBtn = new Button('Confirm', '✓', () => {
-            if (this.onDestroyCallback) {
-                this.onDestroyCallback(this.currentFurnace);
+        // Create dropdown using ItemDropdown component with 'smeltable' class
+        this.smeltDropdown = new ItemDropdown(this.itemRegistry, this.inventoryManager, this.assetLoader, {
+            allowedClasses: ['smeltable'],
+            onSelect: (itemId) => {
+                onSelect(itemId);
+                this.hideSmeltDropdown();
             }
-            modal.hide();
-            this.hide();
-        }, 'danger');
+        });
 
-        const cancelBtn = new Button('Cancel', '✗', () => {
-            modal.hide();
-        }, 'secondary');
+        // Show dropdown anchored to smelt slot
+        this.smeltDropdown.show(this.smeltSlot.getElement());
+    }
 
-        modal.addButton(confirmBtn);
-        modal.addButton(cancelBtn);
-        modal.show();
+    showFuelDropdown(onSelect) {
+        this.hideFuelDropdown();
+
+        if (!this.inventoryManager || !this.fuelSlot) return;
+
+        // Create dropdown using ItemDropdown component with 'combustible' class
+        this.fuelDropdown = new ItemDropdown(this.itemRegistry, this.inventoryManager, this.assetLoader, {
+            allowedClasses: ['combustible'],
+            onSelect: (itemId) => {
+                onSelect(itemId);
+                this.hideFuelDropdown();
+            }
+        });
+
+        // Show dropdown anchored to fuel slot
+        this.fuelDropdown.show(this.fuelSlot.getElement());
+    }
+
+    hideSmeltDropdown() {
+        if (this.smeltDropdown) {
+            this.smeltDropdown.destroy();
+            this.smeltDropdown = null;
+        }
+    }
+
+    hideFuelDropdown() {
+        if (this.fuelDropdown) {
+            this.fuelDropdown.destroy();
+            this.fuelDropdown = null;
+        }
     }
 
     startRefreshInterval() {
         this.stopRefreshInterval();
+
+        // Refresh every 100ms to update progress bar
         this.refreshInterval = setInterval(() => {
             if (this.visible && this.currentFurnace) {
                 this.refresh();
@@ -314,268 +309,48 @@ export class FurnaceInfoPanel {
         }
     }
 
-    refresh() {
-        if (this.visible && this.currentFurnace) {
-            this.buildPanel();
+    positionPanel(tileScreenX, tileScreenY) {
+        const panelWidth = 250;
+        const panelHeight = 320;
+        const offset = 20;
+
+        let left = tileScreenX - panelWidth - offset;
+        let top = tileScreenY - (panelHeight / 2);
+
+        if (left < 20) {
+            left = tileScreenX + offset;
         }
-    }
 
-    positionPanel(screenX, screenY) {
-        const panelRect = this.panel.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        let left = screenX;
-        let top = screenY;
-
-        if (left + panelRect.width > viewportWidth) {
-            left = viewportWidth - panelRect.width - 10;
+        if (left + panelWidth > window.innerWidth - 20) {
+            left = window.innerWidth - panelWidth - 20;
         }
-        if (top + panelRect.height > viewportHeight) {
-            top = viewportHeight - panelRect.height - 10;
-        }
-        if (left < 10) left = 10;
-        if (top < 10) top = 10;
 
-        this.panel.style.position = 'fixed';
+        if (top < 20) {
+            top = 20;
+        }
+        if (top + panelHeight > window.innerHeight - 20) {
+            top = window.innerHeight - panelHeight - 20;
+        }
+
         this.panel.style.left = `${left}px`;
         this.panel.style.top = `${top}px`;
     }
 
-    showSmeltDropdown(inventoryManager, onSelect) {
-        this.hideSmeltDropdown();
-
-        // Get all smeltable items in inventory
-        const smeltableItems = [];
-        const recipes = GameConfig.SMELTING.RECIPES;
-
-        for (const slot of inventoryManager.slots) {
-            if (slot && slot.itemId && recipes[slot.itemId]) {
-                if (!smeltableItems.find(si => si.itemId === slot.itemId)) {
-                    const totalCount = inventoryManager.getItemCount(slot.itemId);
-                    smeltableItems.push({
-                        itemId: slot.itemId,
-                        count: totalCount
-                    });
-                }
-            }
-        }
-
-        if (smeltableItems.length === 0) {
-            return;
-        }
-
-        // Create dropdown
-        this.smeltDropdown = document.createElement('div');
-        this.smeltDropdown.className = 'furnace-item-dropdown';
-        this.smeltDropdown.style.cssText = `
-            position: fixed;
-            background: rgba(44, 62, 80, 0.98);
-            border: 2px solid #34495e;
-            border-radius: 8px;
-            padding: 8px;
-            z-index: 10001;
-            max-height: 200px;
-            overflow-y: auto;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-        `;
-
-        // Add items to dropdown
-        for (const smeltableItem of smeltableItems) {
-            const option = this.createDropdownOption(smeltableItem.itemId, smeltableItem.count, () => {
-                onSelect(smeltableItem.itemId);
-            });
-            this.smeltDropdown.appendChild(option);
-        }
-
-        // Position dropdown near the smelt slot
-        const slotElement = this.panel.querySelector('.furnace-slots');
-        if (slotElement) {
-            const slotRect = slotElement.getBoundingClientRect();
-            this.smeltDropdown.style.left = `${slotRect.left}px`;
-            this.smeltDropdown.style.top = `${slotRect.bottom + 5}px`;
-        }
-
-        document.body.appendChild(this.smeltDropdown);
-
-        // Close dropdown when clicking outside
-        setTimeout(() => {
-            document.addEventListener('pointerdown', this.smeltDropdownClickHandler = (e) => {
-                if (!this.smeltDropdown.contains(e.target)) {
-                    this.hideSmeltDropdown();
-                }
-            });
-        }, 0);
-    }
-
-    showFuelDropdown(inventoryManager, onSelect) {
-        this.hideFuelDropdown();
-
-        // Get all fuel items in inventory
-        const fuelItems = [];
-        const fuels = GameConfig.SMELTING.FUEL_ITEMS;
-
-        for (const slot of inventoryManager.slots) {
-            if (slot && slot.itemId && fuels.includes(slot.itemId)) {
-                if (!fuelItems.find(fi => fi.itemId === slot.itemId)) {
-                    const totalCount = inventoryManager.getItemCount(slot.itemId);
-                    fuelItems.push({
-                        itemId: slot.itemId,
-                        count: totalCount
-                    });
-                }
-            }
-        }
-
-        if (fuelItems.length === 0) {
-            return;
-        }
-
-        // Create dropdown
-        this.fuelDropdown = document.createElement('div');
-        this.fuelDropdown.className = 'furnace-item-dropdown';
-        this.fuelDropdown.style.cssText = `
-            position: fixed;
-            background: rgba(44, 62, 80, 0.98);
-            border: 2px solid #34495e;
-            border-radius: 8px;
-            padding: 8px;
-            z-index: 10001;
-            max-height: 200px;
-            overflow-y: auto;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-        `;
-
-        // Add items to dropdown
-        for (const fuelItem of fuelItems) {
-            const option = this.createDropdownOption(fuelItem.itemId, fuelItem.count, () => {
-                onSelect(fuelItem.itemId);
-            });
-            this.fuelDropdown.appendChild(option);
-        }
-
-        // Position dropdown near the fuel slot
-        const slotElement = this.panel.querySelector('.furnace-slots');
-        if (slotElement) {
-            const slotRect = slotElement.getBoundingClientRect();
-            this.fuelDropdown.style.left = `${slotRect.left}px`;
-            this.fuelDropdown.style.top = `${slotRect.bottom + 5}px`;
-        }
-
-        document.body.appendChild(this.fuelDropdown);
-
-        // Close dropdown when clicking outside
-        setTimeout(() => {
-            document.addEventListener('pointerdown', this.fuelDropdownClickHandler = (e) => {
-                if (!this.fuelDropdown.contains(e.target)) {
-                    this.hideFuelDropdown();
-                }
-            });
-        }, 0);
-    }
-
-    createDropdownOption(itemId, count, onClick) {
-        const item = this.itemRegistry.getItem(itemId);
-        if (!item) return null;
-
-        const option = document.createElement('div');
-        option.className = 'dropdown-option';
-        option.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-        `;
-
-        option.addEventListener('pointerenter', () => {
-            option.style.backgroundColor = 'rgba(52, 73, 94, 0.8)';
-        });
-
-        option.addEventListener('pointerleave', () => {
-            option.style.backgroundColor = 'transparent';
-        });
-
-        // Item icon
-        const icon = document.createElement('div');
-        icon.style.cssText = `
-            font-size: 24px;
-            width: 30px;
-            text-align: center;
-        `;
-
-        if (item.image) {
-            const img = document.createElement('img');
-            img.src = `./assets/${item.image}`;
-            img.alt = item.name;
-            img.style.width = '30px';
-            img.style.height = '30px';
-            img.style.objectFit = 'contain';
-            icon.appendChild(img);
-        } else {
-            icon.textContent = item.emoji || '?';
-        }
-
-        // Item name and count
-        const info = document.createElement('div');
-        info.style.cssText = `
-            flex: 1;
-            color: #ecf0f1;
-            font-size: 14px;
-        `;
-        info.textContent = `${item.name} (${count})`;
-
-        option.appendChild(icon);
-        option.appendChild(info);
-
-        option.addEventListener('pointerdown', (e) => {
-            e.stopPropagation();
-            onClick();
-            this.hideSmeltDropdown();
-            this.hideFuelDropdown();
-        });
-
-        return option;
-    }
-
-    hideSmeltDropdown() {
-        if (this.smeltDropdown) {
-            this.smeltDropdown.remove();
-            this.smeltDropdown = null;
-        }
-        if (this.smeltDropdownClickHandler) {
-            document.removeEventListener('pointerdown', this.smeltDropdownClickHandler);
-            this.smeltDropdownClickHandler = null;
-        }
-    }
-
-    hideFuelDropdown() {
-        if (this.fuelDropdown) {
-            this.fuelDropdown.remove();
-            this.fuelDropdown = null;
-        }
-        if (this.fuelDropdownClickHandler) {
-            document.removeEventListener('pointerdown', this.fuelDropdownClickHandler);
-            this.fuelDropdownClickHandler = null;
-        }
-    }
-
     hide() {
+        this.stopRefreshInterval();
         this.hideSmeltDropdown();
         this.hideFuelDropdown();
         this.panel.classList.add('hidden');
         this.visible = false;
         this.currentFurnace = null;
-        this.stopRefreshInterval();
+        this.onDestroyCallback = null;
+        this.onSmeltSlotClickCallback = null;
+        this.onFuelSlotClickCallback = null;
+        this.onOutputSlotClickCallback = null;
+        this.inventoryManager = null;
     }
 
     isVisible() {
         return this.visible;
-    }
-
-    getCurrentFurnace() {
-        return this.currentFurnace;
     }
 }

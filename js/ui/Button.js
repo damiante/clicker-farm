@@ -52,6 +52,12 @@ export class Button {
             button.style.backgroundColor = UITheme.COLORS.DANGER;
         } else if (this.variant === 'success') {
             button.style.backgroundColor = UITheme.COLORS.SUCCESS;
+        } else if (this.variant === 'secondary') {
+            button.style.backgroundColor = UITheme.COLORS.BACKGROUND_DARK;
+        } else if (this.variant === 'disabled') {
+            button.style.backgroundColor = UITheme.COLORS.BACKGROUND;
+            button.style.opacity = '0.5';
+            button.style.cursor = 'not-allowed';
         }
 
         button.addEventListener('pointerover', () => {
@@ -61,7 +67,10 @@ export class Button {
                 button.style.backgroundColor = UITheme.COLORS.DANGER_HOVER;
             } else if (this.variant === 'success') {
                 button.style.backgroundColor = UITheme.COLORS.SUCCESS_HOVER;
+            } else if (this.variant === 'secondary') {
+                button.style.backgroundColor = '#34495e'; // Slightly lighter than BACKGROUND_DARK
             }
+            // disabled variant doesn't change on hover
         });
 
         button.addEventListener('pointerout', () => {
@@ -71,7 +80,10 @@ export class Button {
                 button.style.backgroundColor = UITheme.COLORS.DANGER;
             } else if (this.variant === 'success') {
                 button.style.backgroundColor = UITheme.COLORS.SUCCESS;
+            } else if (this.variant === 'secondary') {
+                button.style.backgroundColor = UITheme.COLORS.BACKGROUND_DARK;
             }
+            // disabled variant doesn't change on hover
         });
 
         button.addEventListener('pointerdown', () => {

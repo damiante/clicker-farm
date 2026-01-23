@@ -1,12 +1,19 @@
 import { Button } from '../ui/Button.js';
+import { ItemSlot } from '../ui/ItemSlot.js';
+import { UIComponentTheme } from '../config/UIComponentTheme.js';
 
 export class NPCInfoPanel {
-    constructor(itemRegistry) {
+    constructor(itemRegistry, assetLoader) {
         this.itemRegistry = itemRegistry;
+        this.assetLoader = assetLoader;
         this.panel = null;
         this.visible = false;
         this.currentNPC = null;
         this.onTakeItemCallback = null;
+
+        // Component instances
+        this.itemSlot = null;
+
         this.createPanel();
     }
 
@@ -70,7 +77,7 @@ export class NPCInfoPanel {
         this.panel.appendChild(name);
         this.panel.appendChild(description);
 
-        // Item slot
+        // Item slot using ItemSlot component
         const slotContainer = document.createElement('div');
         slotContainer.style.cssText = `
             display: flex;
@@ -85,10 +92,22 @@ export class NPCInfoPanel {
         slotLabel.style.fontSize = '12px';
         slotLabel.style.color = '#888';
 
-        const slot = this.createItemSlot(npc.itemSlot);
+        // Create ItemSlot component
+        this.itemSlot = new ItemSlot('medium', npc.itemSlot, this.itemRegistry, this.assetLoader, {
+            isOutput: true,
+            clickable: true,
+            onSlotClick: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (npc.itemSlot && this.onTakeItemCallback) {
+                    this.onTakeItemCallback(this.currentNPC);
+                    this.refresh();
+                }
+            }
+        });
 
         slotContainer.appendChild(slotLabel);
-        slotContainer.appendChild(slot);
+        slotContainer.appendChild(this.itemSlot.getElement());
 
         this.panel.appendChild(slotContainer);
 
@@ -100,79 +119,20 @@ export class NPCInfoPanel {
                     this.refresh();
                 }
             }, 'success');
+            takeBtn.getElement().style.width = UIComponentTheme.PANEL.BUTTON.WIDTH;
 
             this.panel.appendChild(takeBtn.getElement());
         }
     }
 
-    createItemSlot(itemSlot) {
-        const slot = document.createElement('div');
-        slot.className = 'npc-item-slot';
-        slot.style.cssText = `
-            width: 60px;
-            height: 60px;
-            border: 2px solid #444;
-            border-radius: 4px;
-            background-color: #222;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            cursor: ${itemSlot ? 'pointer' : 'default'};
-        `;
-
-        if (itemSlot) {
-            const slotItem = this.itemRegistry.getItem(itemSlot.itemId);
-            if (slotItem) {
-                if (slotItem.image) {
-                    const img = document.createElement('img');
-                    img.src = `./assets/${slotItem.image}`;
-                    img.alt = slotItem.name;
-                    img.style.width = '50px';
-                    img.style.height = '50px';
-                    img.style.objectFit = 'contain';
-                    slot.appendChild(img);
-                } else {
-                    slot.textContent = slotItem.emoji;
-                    slot.style.fontSize = '40px';
-                }
-
-                // Add count badge
-                if (itemSlot.count > 1) {
-                    const countBadge = document.createElement('div');
-                    countBadge.className = 'count-badge';
-                    countBadge.textContent = itemSlot.count;
-                    countBadge.style.cssText = `
-                        position: absolute;
-                        bottom: 2px;
-                        right: 2px;
-                        background-color: #000;
-                        color: #fff;
-                        border-radius: 8px;
-                        padding: 2px 5px;
-                        font-size: 12px;
-                        font-weight: bold;
-                    `;
-                    slot.appendChild(countBadge);
-                }
-
-                // Add click handler to take item
-                slot.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (this.onTakeItemCallback) {
-                        this.onTakeItemCallback(this.currentNPC);
-                        this.refresh();
-                    }
-                });
-            }
-        }
-
-        return slot;
-    }
-
     refresh() {
-        if (this.visible && this.currentNPC) {
-            this.buildPanel();
+        if (!this.visible || !this.currentNPC) return;
+
+        const npc = this.currentNPC;
+
+        // Update slot contents using ItemSlot.updateContents()
+        if (this.itemSlot) {
+            this.itemSlot.updateContents(npc.itemSlot);
         }
     }
 

@@ -197,6 +197,15 @@ export class Plant extends Entity {
         return this.fruitSlot !== null && this.fruitSlot.count > 0;
     }
 
+    // Universal output collection interface (for gloves painting)
+    hasOutputToCollect() {
+        return this.fruitSlot !== null && this.fruitSlot.count > 0;
+    }
+
+    collectFirstOutput() {
+        return this.takeFruit();
+    }
+
     canHarvest() {
         return this.growthStage === 'mature';
     }

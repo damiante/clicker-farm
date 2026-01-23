@@ -1,8 +1,10 @@
 import { Button } from '../ui/Button.js';
+import { UIComponentTheme } from '../config/UIComponentTheme.js';
 
 export class FenceInfoPanel {
-    constructor(itemRegistry) {
+    constructor(itemRegistry, assetLoader) {
         this.itemRegistry = itemRegistry;
+        this.assetLoader = assetLoader;
         this.panel = null;
         this.visible = false;
         this.currentFence = null;
@@ -76,6 +78,7 @@ export class FenceInfoPanel {
             }
             this.hide();
         }, 'success');
+        pickupBtn.getElement().style.width = UIComponentTheme.PANEL.BUTTON.WIDTH;
 
         buttonContainer.appendChild(pickupBtn.getElement());
         this.panel.appendChild(buttonContainer);

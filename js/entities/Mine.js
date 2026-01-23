@@ -95,6 +95,21 @@ export class Mine extends Entity {
         return taken;
     }
 
+    // Universal output collection interface (for gloves painting)
+    hasOutputToCollect() {
+        return this.outputSlots.some(slot => slot !== null && slot.count > 0);
+    }
+
+    collectFirstOutput() {
+        // Find first non-empty slot and take from it
+        for (let i = 0; i < this.outputSlots.length; i++) {
+            if (this.outputSlots[i]) {
+                return this.takeFromSlot(i);
+            }
+        }
+        return null;
+    }
+
     // Check if mine can be picked up (removed)
     canPickup() {
         // Can't pickup if any slot has items

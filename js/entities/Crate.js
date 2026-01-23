@@ -20,7 +20,11 @@ export class Crate extends Entity {
             return { error: 'Invalid slot index' };
         }
 
-        this.maxStackSize = maxStackSize;
+        // Update maxStackSize at the beginning
+        if (maxStackSize !== undefined) {
+            this.maxStackSize = maxStackSize;
+        }
+
         const slot = this.slots[slotIndex];
 
         if (!slot) {
@@ -65,6 +69,41 @@ export class Crate extends Entity {
         const taken = { ...slot };
         this.slots[slotIndex] = null;
         return taken;
+    }
+
+    // Universal painting interface methods
+    acceptsItemInSlot(itemId, itemRegistry) {
+        const item = itemRegistry.getItem(itemId);
+        if (!item) return false;
+
+        const itemClasses = item.itemClasses || ['storable'];
+
+        // Check if item is storable (most items)
+        if (itemClasses.includes('storable')) {
+            // Find first empty slot or matching slot with space
+            for (let i = 0; i < this.slots.length; i++) {
+                const slot = this.slots[i];
+                if (!slot) {
+                    return `slot${i}`;
+                } else if (slot.itemId === itemId && slot.count < this.maxStackSize) {
+                    return `slot${i}`;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    placeItemInSlot(itemId, slotType, count, maxStackSize, itemRegistry) {
+        // Extract slot index from slotType (e.g., "slot0", "slot1", etc.)
+        if (slotType.startsWith('slot')) {
+            const slotIndex = parseInt(slotType.substring(4));
+            if (!isNaN(slotIndex) && slotIndex >= 0 && slotIndex < 9) {
+                const result = this.placeInSlot(slotIndex, itemId, count, maxStackSize);
+                return !result || !result.overflow || result.overflow.count < count;
+            }
+        }
+        return false;
     }
 
     // Check if crate can be picked up (removed)

@@ -6,6 +6,7 @@
     "description": "Plant to grow a sunflower",
     "salePrice": 0.05,
     "itemType": "seed",
+    "itemClasses": ["placeable", "storable"],
     "growsInto": "sunflower",
     "sproutTime": 5,
     "maturityTime": 10,
@@ -19,6 +20,7 @@
     "description": "A bright yellow sunflower",
     "salePrice": 0.07,
     "itemType": "plant",
+    "itemClasses": ["harvestable", "storable"],
     "plantType": "flower",
     "overworldScale": 0.5
   },
@@ -29,6 +31,7 @@
     "description": "Plant to grow a hyacinth",
     "salePrice": 0.25,
     "itemType": "seed",
+    "itemClasses": ["placeable", "storable"],
     "growsInto": "hyacinth",
     "sproutTime": 10,
     "maturityTime": 15,
@@ -42,6 +45,7 @@
     "description": "A beautiful purple hyacinth",
     "salePrice": 0.35,
     "itemType": "plant",
+    "itemClasses": ["harvestable", "storable"],
     "plantType": "flower",
     "overworldScale": 0.5
   },
@@ -52,6 +56,7 @@
     "description": "Plant to grow a tulip",
     "salePrice": 0.50,
     "itemType": "seed",
+    "itemClasses": ["placeable", "storable"],
     "growsInto": "tulip",
     "sproutTime": 15,
     "maturityTime": 20,
@@ -65,6 +70,7 @@
     "description": "A vibrant red tulip",
     "salePrice": 0.70,
     "itemType": "plant",
+    "itemClasses": ["harvestable", "storable"],
     "plantType": "flower",
     "overworldScale": 0.5
   },
@@ -75,6 +81,7 @@
     "description": "Plant to grow beautiful roses",
     "salePrice": 1.00,
     "itemType": "seed",
+    "itemClasses": ["placeable", "storable"],
     "growsInto": "rose",
     "sproutTime": 30,
     "maturityTime": 30,
@@ -88,6 +95,7 @@
     "description": "A beautiful red rose",
     "salePrice": 1.50,
     "itemType": "plant",
+    "itemClasses": ["harvestable", "storable"],
     "plantType": "flower",
     "overworldScale": 0.5
   },
@@ -98,6 +106,7 @@
     "description": "Plant to grow a sturdy tree",
     "salePrice": 20,
     "itemType": "seed",
+    "itemClasses": ["placeable", "storable"],
     "growsInto": "tree",
     "sproutTime": 300,
     "maturityTime": 300,
@@ -111,6 +120,7 @@
     "description": "A strong pine tree",
     "salePrice": 1.50,
     "itemType": "plant",
+    "itemClasses": ["harvestable"],
     "plantType": "tree",
     "overworldScale": 1.2
   },
@@ -121,6 +131,7 @@
     "description": "A young sprout",
     "salePrice": 0,
     "itemType": "growth_stage",
+    "itemClasses": ["storable"],
     "overworldScale": 0.9
   },
   "wood": {
@@ -130,6 +141,7 @@
     "description": "Lumber harvested from trees",
     "salePrice": 1.00,
     "itemType": "resource",
+    "itemClasses": ["storable"],
     "overworldScale": 0.8
   },
   "scissors": {
@@ -139,6 +151,7 @@
     "description": "Paint-harvest flowers and grains efficiently",
     "salePrice": 50.00,
     "itemType": "tool",
+    "itemClasses": ["storable"],
     "overworldScale": 0.7
   },
   "axe": {
@@ -148,6 +161,7 @@
     "description": "Required to harvest trees",
     "salePrice": 10.00,
     "itemType": "tool",
+    "itemClasses": ["storable"],
     "overworldScale": 0.7
   },
   "saw": {
@@ -157,6 +171,7 @@
     "description": "Paint-harvest trees efficiently",
     "salePrice": 1500.00,
     "itemType": "tool",
+    "itemClasses": ["storable"],
     "toolPrerequisite": "axe",
     "overworldScale": 0.7
   },
@@ -167,6 +182,7 @@
     "description": "Paint-gather fruits and fermented items efficiently",
     "salePrice": 5000.00,
     "itemType": "tool",
+    "itemClasses": ["storable"],
     "overworldScale": 0.7
   },
   "fence": {
@@ -176,6 +192,7 @@
     "description": "A wooden fence for enclosing areas",
     "salePrice": 10.00,
     "itemType": "structure",
+    "itemClasses": ["placeable", "storable"],
     "requirements": {
       "wood": 1
     },
@@ -188,6 +205,7 @@
     "description": "A wooden barrel for fermentation",
     "salePrice": 50.00,
     "itemType": "structure",
+    "itemClasses": ["placeable", "storable"],
     "requirements": {
       "wood": 5
     },
@@ -200,6 +218,7 @@
     "description": "Plant to grow rice",
     "salePrice": 25.00,
     "itemType": "seed",
+    "itemClasses": ["placeable", "storable"],
     "growsInto": "rice",
     "sproutTime": 80,
     "maturityTime": 160,
@@ -213,6 +232,7 @@
     "description": "Golden rice stalks",
     "salePrice": 30.00,
     "itemType": "plant",
+    "itemClasses": ["harvestable", "fermentable", "storable"],
     "plantType": "grain",
     "overworldScale": 0.5
   },
@@ -223,6 +243,7 @@
     "description": "Fermented rice wine",
     "salePrice": 40.00,
     "itemType": "resource",
+    "itemClasses": ["processed", "storable"],
     "overworldScale": 0.7
   },
   "wheat_seed": {
@@ -232,6 +253,7 @@
     "description": "Plant to grow wheat",
     "salePrice": 45.00,
     "itemType": "seed",
+    "itemClasses": ["placeable", "storable"],
     "growsInto": "wheat",
     "sproutTime": 80,
     "maturityTime": 160,
@@ -245,6 +267,7 @@
     "description": "Amber waves of grain",
     "salePrice": 50.00,
     "itemType": "plant",
+    "itemClasses": ["harvestable", "fermentable", "storable"],
     "plantType": "grain",
     "overworldScale": 0.5
   },
@@ -255,6 +278,7 @@
     "description": "Fermented wheat beverage",
     "salePrice": 75.00,
     "itemType": "resource",
+    "itemClasses": ["processed", "storable"],
     "overworldScale": 0.7
   },
   "grape_seed": {
@@ -264,6 +288,7 @@
     "description": "Plant to grow a grapevine",
     "salePrice": 300.00,
     "itemType": "seed",
+    "itemClasses": ["placeable", "storable"],
     "growsInto": "grape_vine",
     "sproutTime": 200,
     "maturityTime": 600,
@@ -277,6 +302,7 @@
     "description": "A lush grapevine that produces fruit",
     "salePrice": 100.00,
     "itemType": "plant",
+    "itemClasses": ["harvestable"],
     "plantType": "fruiting",
     "overworldScale": 0.6
   },
@@ -287,6 +313,7 @@
     "description": "Fresh grapes harvested from the vine",
     "salePrice": 10.00,
     "itemType": "resource",
+    "itemClasses": ["fruit", "fermentable", "storable"],
     "overworldScale": 0.6
   },
   "wine": {
@@ -296,6 +323,7 @@
     "description": "Fermented grape wine",
     "salePrice": 75.00,
     "itemType": "resource",
+    "itemClasses": ["processed", "storable"],
     "overworldScale": 0.7
   },
   "rock": {
@@ -305,6 +333,7 @@
     "description": "A solid piece of stone",
     "salePrice": 2.00,
     "itemType": "resource",
+    "itemClasses": ["smeltable", "storable"],
     "overworldScale": 0.6
   },
   "ore": {
@@ -314,6 +343,7 @@
     "description": "Raw ore ready for smelting",
     "salePrice": 5.00,
     "itemType": "resource",
+    "itemClasses": ["smeltable", "storable"],
     "overworldScale": 0.6
   },
   "coal": {
@@ -323,6 +353,7 @@
     "description": "Burnable fuel for furnaces",
     "salePrice": 3.00,
     "itemType": "resource",
+    "itemClasses": ["combustible", "storable"],
     "overworldScale": 0.6
   },
   "brick": {
@@ -332,6 +363,7 @@
     "description": "Smelted stone brick",
     "salePrice": 4.00,
     "itemType": "resource",
+    "itemClasses": ["processed", "storable"],
     "overworldScale": 0.6
   },
   "iron": {
@@ -341,6 +373,7 @@
     "description": "Smelted iron ingot",
     "salePrice": 10.00,
     "itemType": "resource",
+    "itemClasses": ["processed", "storable"],
     "overworldScale": 0.6
   },
   "mine": {
@@ -350,6 +383,7 @@
     "description": "Extract rocks, ore, and coal",
     "salePrice": 100.00,
     "itemType": "structure",
+    "itemClasses": ["placeable", "storable"],
     "overworldScale": 2.0,
     "multiTile": {
       "width": 2,
@@ -364,6 +398,7 @@
     "description": "Smelt ore and rocks into materials",
     "salePrice": 200.00,
     "itemType": "structure",
+    "itemClasses": ["placeable", "storable"],
     "requirements": {
       "rock": 5
     },
@@ -376,6 +411,7 @@
     "description": "Store items in a 3x3 grid",
     "salePrice": 500.00,
     "itemType": "structure",
+    "itemClasses": ["placeable", "storable"],
     "requirements": {
       "wood": 10,
       "iron": 1
@@ -389,6 +425,7 @@
     "description": "Harvests plants and stores them in crates",
     "salePrice": 1000.00,
     "itemType": "npc",
+    "itemClasses": ["placeable"],
     "overworldScale": 1.0,
     "directPlacement": true
   }

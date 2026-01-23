@@ -40,4 +40,4 @@ You are welcome to name this functionality differently if "class" would clash wi
 
 # 5. CLAUDE.md reworking
 
-After refactoring the codebase in the above ways, I want you to rewrite the CLAUDE.md file from scratch. I want you to explain the new implementation so that future iterations can implement new capabilities using the generic stylings and functionalities you rewrote as part of this session. Ensure that it's clear that all future features should use these implementations rather than
+After refactoring the codebase in the above ways, I want you to rewrite the CLAUDE.md file from scratch. I want you to explain the new implementation so that future iterations can implement new capabilities using the generic stylings and functionalities you rewrote as part of this session. Ensure that it's clear that all future features should use these implementations rather than writing new implementations or styles for concepts like item slots, dropdowns, progress indicators, etc.

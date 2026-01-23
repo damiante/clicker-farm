@@ -56,6 +56,35 @@ export class ItemPreviewPanel {
         description.className = 'preview-description';
         description.textContent = item.description;
 
+        this.panel.appendChild(icon);
+        this.panel.appendChild(name);
+        this.panel.appendChild(description);
+
+        // Item classes section
+        if (item.itemClasses && item.itemClasses.length > 0) {
+            const classesContainer = document.createElement('div');
+            classesContainer.className = 'preview-classes';
+            classesContainer.style.cssText = 'margin: 8px 0; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px;';
+
+            const classesLabel = document.createElement('div');
+            classesLabel.textContent = 'Item Classes:';
+            classesLabel.style.cssText = 'font-size: 11px; color: #888; margin-bottom: 4px; text-transform: uppercase;';
+
+            const classesList = document.createElement('div');
+            classesList.style.cssText = 'display: flex; flex-wrap: wrap; gap: 4px;';
+
+            item.itemClasses.forEach(className => {
+                const badge = document.createElement('span');
+                badge.textContent = className;
+                badge.style.cssText = 'display: inline-block; padding: 2px 8px; background: rgba(74, 144, 226, 0.3); color: #4A90E2; border-radius: 3px; font-size: 11px; font-weight: bold;';
+                classesList.appendChild(badge);
+            });
+
+            classesContainer.appendChild(classesLabel);
+            classesContainer.appendChild(classesList);
+            this.panel.appendChild(classesContainer);
+        }
+
         // Additional info for seeds
         if (item.itemType === 'seed') {
             const growthInfo = document.createElement('div');
@@ -64,14 +93,7 @@ export class ItemPreviewPanel {
                 <div class="growth-time">🌱 Sprouts in ${item.sproutTime}s</div>
                 <div class="growth-time">🌻 Matures in ${item.maturityTime}s</div>
             `;
-            this.panel.appendChild(icon);
-            this.panel.appendChild(name);
-            this.panel.appendChild(description);
             this.panel.appendChild(growthInfo);
-        } else {
-            this.panel.appendChild(icon);
-            this.panel.appendChild(name);
-            this.panel.appendChild(description);
         }
 
         // Sale price info

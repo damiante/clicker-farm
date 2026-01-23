@@ -155,6 +155,45 @@ export class Barrel extends Entity {
         return taken;
     }
 
+    // Universal output collection interface (for gloves painting)
+    hasOutputToCollect() {
+        return this.outputSlot !== null && this.outputSlot.count > 0;
+    }
+
+    collectFirstOutput() {
+        return this.takeFromOutput();
+    }
+
+    // Universal painting interface methods
+    acceptsItemInSlot(itemId, itemRegistry) {
+        const item = itemRegistry.getItem(itemId);
+        if (!item) return false;
+
+        const itemClasses = item.itemClasses || ['storable'];
+
+        // Check if item is fermentable and can be placed in input slot
+        if (itemClasses.includes('fermentable')) {
+            // Accept if input slot is empty, same item, or can stack
+            if (!this.inputSlot) {
+                return 'input';
+            } else if (this.inputSlot.itemId === itemId && this.inputSlot.count < this.maxStackSize) {
+                return 'input';
+            }
+        }
+
+        return false;
+    }
+
+    placeItemInSlot(itemId, slotType, count, maxStackSize, itemRegistry) {
+        if (slotType === 'input') {
+            // Use existing placeInInput method
+            const result = this.placeInInput(itemId, count, maxStackSize);
+            // Return true if placement was successful (even partial)
+            return !result || !result.overflow || result.overflow.count < count;
+        }
+        return false;
+    }
+
     isFermenting() {
         return this.activeItem !== null && this.fermentationStartTime !== null;
     }

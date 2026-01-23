@@ -228,6 +228,65 @@ export class Furnace extends Entity {
         return taken;
     }
 
+    // Universal output collection interface (for gloves painting)
+    hasOutputToCollect() {
+        return this.outputSlot !== null && this.outputSlot.count > 0;
+    }
+
+    collectFirstOutput() {
+        return this.takeFromOutput();
+    }
+
+    // Universal painting interface methods
+    acceptsItemInSlot(itemId, itemRegistry) {
+        const item = itemRegistry.getItem(itemId);
+        if (!item) {
+            console.log(`[Furnace.acceptsItemInSlot] Item not found: ${itemId}`);
+            return false;
+        }
+
+        const itemClasses = item.itemClasses || ['storable'];
+        console.log(`[Furnace.acceptsItemInSlot] Item ${itemId} has classes: ${itemClasses.join(', ')}`);
+
+        // Check if item is smeltable and can be placed in smelt slot
+        if (itemClasses.includes('smeltable')) {
+            console.log(`[Furnace.acceptsItemInSlot] Item is smeltable. smeltSlot:`, this.smeltSlot);
+            if (!this.smeltSlot) {
+                console.log(`[Furnace.acceptsItemInSlot] Accepting into empty smelt slot`);
+                return 'smelt';
+            } else if (this.smeltSlot.itemId === itemId && this.smeltSlot.count < this.maxStackSize) {
+                console.log(`[Furnace.acceptsItemInSlot] Accepting into existing smelt slot`);
+                return 'smelt';
+            }
+        }
+
+        // Check if item is combustible and can be placed in fuel slot
+        if (itemClasses.includes('combustible')) {
+            console.log(`[Furnace.acceptsItemInSlot] Item is combustible. fuelSlot:`, this.fuelSlot);
+            if (!this.fuelSlot) {
+                console.log(`[Furnace.acceptsItemInSlot] Accepting into empty fuel slot`);
+                return 'fuel';
+            } else if (this.fuelSlot.itemId === itemId && this.fuelSlot.count < this.maxStackSize) {
+                console.log(`[Furnace.acceptsItemInSlot] Accepting into existing fuel slot`);
+                return 'fuel';
+            }
+        }
+
+        console.log(`[Furnace.acceptsItemInSlot] Item not accepted`);
+        return false;
+    }
+
+    placeItemInSlot(itemId, slotType, count, maxStackSize, itemRegistry) {
+        if (slotType === 'smelt') {
+            const result = this.placeInSmeltSlot(itemId, count, maxStackSize);
+            return !result || !result.overflow || result.overflow.count < count;
+        } else if (slotType === 'fuel') {
+            const result = this.placeInFuelSlot(itemId, count, maxStackSize);
+            return !result || !result.overflow || result.overflow.count < count;
+        }
+        return false;
+    }
+
     canPickup() {
         // Can't pickup if furnace has items or is smelting
         return !this.smeltSlot && !this.fuelSlot && !this.outputSlot && !this.isActive;

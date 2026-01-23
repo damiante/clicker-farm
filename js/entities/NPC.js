@@ -163,6 +163,15 @@ export class NPC extends Entity {
         return this.itemSlot !== null && this.itemSlot.count > 0;
     }
 
+    // Universal output collection interface (for gloves painting)
+    hasOutputToCollect() {
+        return this.itemSlot !== null && this.itemSlot.count > 0;
+    }
+
+    collectFirstOutput() {
+        return this.takeItem();
+    }
+
     // Get overlay icon for held item
     getOverlayIcons() {
         if (!this.itemSlot || !this.itemSlot.itemId) {

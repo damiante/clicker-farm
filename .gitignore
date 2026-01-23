@@ -1,6 +1,7 @@
 # Project-specific files
 requirements.md
 iteration*.md
+refactor*.md
 
 # Dependencies
 node_modules/

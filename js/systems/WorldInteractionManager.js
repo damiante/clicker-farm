@@ -16,18 +16,19 @@ export class WorldInteractionManager {
         this.inventoryManager = inventoryManager;
         this.inventoryPanel = inventoryPanel;
         this.toolsPanel = toolsPanel;
-        this.plantInfoPanel = new PlantInfoPanel(itemRegistry, game);
-        this.fenceInfoPanel = new FenceInfoPanel(itemRegistry);
-        this.barrelInfoPanel = new BarrelInfoPanel(itemRegistry);
-        this.mineInfoPanel = new MineInfoPanel(itemRegistry);
-        this.furnaceInfoPanel = new FurnaceInfoPanel(itemRegistry);
-        this.crateInfoPanel = new CrateInfoPanel(itemRegistry);
-        this.npcInfoPanel = new NPCInfoPanel(itemRegistry);
+        this.plantInfoPanel = new PlantInfoPanel(itemRegistry, game, game.assetLoader);
+        this.fenceInfoPanel = new FenceInfoPanel(itemRegistry, game.assetLoader);
+        this.barrelInfoPanel = new BarrelInfoPanel(itemRegistry, game.assetLoader);
+        this.mineInfoPanel = new MineInfoPanel(itemRegistry, game.assetLoader);
+        this.furnaceInfoPanel = new FurnaceInfoPanel(itemRegistry, game.assetLoader);
+        this.crateInfoPanel = new CrateInfoPanel(itemRegistry, game.assetLoader);
+        this.npcInfoPanel = new NPCInfoPanel(itemRegistry, game.assetLoader);
 
         this.lastPointerDownPos = null;
         this.currentMousePos = null;  // Track mouse position for placement preview
         this.isDragging = false;  // Track if user is dragging
-        this.paintedTiles = new Set();  // Track tiles painted during current drag
+        this.lastPaintedTile = null;  // Track the last painted tile (allows re-painting if cursor moves away and back)
+        this.lastPaintedEntity = null;  // Track the last entity interacted with during drag
         this.justPlacedItem = false;  // Track if item was placed during current click sequence
         this.setupListeners();
     }
@@ -37,29 +38,47 @@ export class WorldInteractionManager {
         this.inputManager.on('pointerdown', (event) => {
             this.lastPointerDownPos = { x: event.position.x, y: event.position.y };
             this.isDragging = false;
-            this.paintedTiles.clear();
+            this.lastPaintedTile = null;
+            this.lastPaintedEntity = null;
             this.justPlacedItem = false;
 
             const worldPos = this.renderer.screenToWorld(event.position.x, event.position.y);
-            const tileX = worldPos.x;
-            const tileY = worldPos.y;
+            const tileX = Math.floor(worldPos.x);
+            const tileY = Math.floor(worldPos.y);
             const tileKey = `${tileX},${tileY}`;
 
             // Check for tool or item selection
             const selectedTool = this.toolsPanel ? this.toolsPanel.getSelectedTool() : null;
             const selectedItem = this.inventoryPanel.getSelectedItem();
 
-            // If a tool is selected, try to harvest on pointer down
-            if (selectedTool) {
-                if (this.tryHarvestWithTool(selectedTool, tileX, tileY)) {
-                    this.paintedTiles.add(tileKey);
+            // If gloves selected (no item), try to collect output
+            if (selectedTool === 'gloves' && !selectedItem) {
+                const entity = this.getEntityAtTile(tileX, tileY);
+                if (this.tryCollectOutput(tileX, tileY)) {
+                    this.lastPaintedEntity = entity;
+                    this.lastPaintedTile = tileKey;
                     this.justPlacedItem = true;
                 }
             }
-            // If an item is selected, try to place on pointer down
+            // If other tool is selected (scissors, saw), try to harvest
+            else if (selectedTool) {
+                if (this.tryHarvestWithTool(selectedTool, tileX, tileY)) {
+                    this.lastPaintedTile = tileKey;
+                    this.justPlacedItem = true;
+                }
+            }
+            // If item selected (no tool), try to paint into slot OR place on world
             else if (selectedItem) {
-                if (this.tryPlaceItem(selectedItem.itemId, selectedItem.slotIndex, tileX, tileY)) {
-                    this.paintedTiles.add(tileKey);
+                // Try painting into slot first (requires gloves owned)
+                const entity = this.getEntityAtTile(tileX, tileY);
+                if (this.tryPaintIntoSlot(tileX, tileY)) {
+                    this.lastPaintedEntity = entity;
+                    this.lastPaintedTile = tileKey;
+                    this.justPlacedItem = true;
+                }
+                // Otherwise try placing on world
+                else if (this.tryPlaceItem(selectedItem.itemId, selectedItem.slotIndex, tileX, tileY)) {
+                    this.lastPaintedTile = tileKey;
                     this.justPlacedItem = true;
                 }
             }
@@ -87,24 +106,58 @@ export class WorldInteractionManager {
 
                     if (selectedTool || selectedItem) {
                         const worldPos = this.renderer.screenToWorld(event.position.x, event.position.y);
-                        const tileX = worldPos.x;
-                        const tileY = worldPos.y;
+                        const tileX = Math.floor(worldPos.x);
+                        const tileY = Math.floor(worldPos.y);
                         const tileKey = `${tileX},${tileY}`;
 
-                        // Only paint if we haven't painted this tile yet in this drag
-                        if (!this.paintedTiles.has(tileKey)) {
-                            if (selectedTool) {
-                                // Tool-based harvesting
-                                if (this.tryHarvestWithTool(selectedTool, tileX, tileY)) {
-                                    this.paintedTiles.add(tileKey);
+                        // Get entity at current tile for entity-based tracking
+                        const entity = this.getEntityAtTile(tileX, tileY);
+                        const entityChanged = entity !== this.lastPaintedEntity;
+                        const tileChanged = this.lastPaintedTile !== tileKey;
+
+                        // Gloves collecting output: interact when entity changes
+                        if (selectedTool === 'gloves' && !selectedItem && entityChanged) {
+                            if (this.tryCollectOutput(tileX, tileY)) {
+                                this.lastPaintedEntity = entity;
+                                this.lastPaintedTile = tileKey;
+                                this.justPlacedItem = true;
+                            } else {
+                                // Even if collection failed, update entity tracker to allow re-entry detection
+                                this.lastPaintedEntity = entity;
+                            }
+                        }
+                        // Other tools (scissors, saw): interact when tile changes
+                        else if (selectedTool && tileChanged) {
+                            if (this.tryHarvestWithTool(selectedTool, tileX, tileY)) {
+                                this.lastPaintedTile = tileKey;
+                                this.justPlacedItem = true;
+                            }
+                        }
+                        // Item selected: try painting into entity first (entity-based), then world placement (tile-based)
+                        else if (selectedItem) {
+                            // Try painting into slot first (requires gloves owned) - entity-based
+                            if (entity && entityChanged) {
+                                if (this.tryPaintIntoSlot(tileX, tileY)) {
+                                    this.lastPaintedEntity = entity;
+                                    this.lastPaintedTile = tileKey;
                                     this.justPlacedItem = true;
-                                }
-                            } else if (selectedItem) {
-                                // Item placement
-                                if (this.tryPlaceItem(selectedItem.itemId, selectedItem.slotIndex, tileX, tileY)) {
-                                    this.paintedTiles.add(tileKey);
+                                } else {
+                                    // Even if painting failed, update entity tracker to allow re-entry detection
+                                    this.lastPaintedEntity = entity;
                                 }
                             }
+                            // Otherwise try placing on world - tile-based
+                            else if (!entity && tileChanged) {
+                                if (this.tryPlaceItem(selectedItem.itemId, selectedItem.slotIndex, tileX, tileY)) {
+                                    this.lastPaintedTile = tileKey;
+                                }
+                                // Update entity tracker when moving to empty space
+                                this.lastPaintedEntity = null;
+                            }
+                        }
+                        // Update entity tracker when moving to empty space (no item/tool selected, or tool that doesn't interact)
+                        else if (!entity) {
+                            this.lastPaintedEntity = null;
                         }
                     }
                 }
@@ -131,7 +184,7 @@ export class WorldInteractionManager {
 
             this.lastPointerDownPos = null;
             this.isDragging = false;
-            this.paintedTiles.clear();
+            this.lastPaintedTile = null;
             this.justPlacedItem = false;
         });
     }
@@ -254,18 +307,57 @@ export class WorldInteractionManager {
             screenPos.y,
             (pickedUpBarrel) => this.pickupBarrel(pickedUpBarrel),
             (clickedBarrel) => this.onBarrelInputSlotClick(clickedBarrel),
-            (clickedBarrel) => this.onBarrelInputTakeClick(clickedBarrel),
-            (clickedBarrel) => this.onBarrelOutputSlotClick(clickedBarrel)
+            (clickedBarrel) => this.onBarrelOutputSlotClick(clickedBarrel),
+            this.inventoryManager
         );
     }
 
     onBarrelInputSlotClick(barrel) {
-        // Get selected item from inventory
+        // Check if slot has items (taking out)
+        if (barrel.inputSlot) {
+            // Take items from input slot
+            const taken = barrel.takeFromInput();
+            if (!taken) {
+                console.warn('No items in input slot');
+                return;
+            }
+
+            // Add to inventory
+            if (this.inventoryManager.hasRoomFor(taken.itemId)) {
+                this.inventoryManager.addItem(taken.itemId, taken.count);
+
+                // Notify about new item
+                this.game.inventoryPanel.notifyItemAdded();
+
+                // Refresh inventory panel if visible
+                if (this.game.inventoryPanel.isVisible()) {
+                    this.game.inventoryPanel.refresh();
+                }
+
+                // Refresh barrel panel to show updated slots
+                if (this.barrelInfoPanel.isVisible()) {
+                    this.barrelInfoPanel.refresh();
+                }
+
+                // Update shop affordability
+                this.game.shopMenu.updateAffordability();
+
+                // Save state
+                this.game.stateManager.scheduleSave(this.game.getGameState());
+            } else {
+                // Put items back if inventory is full
+                barrel.inputSlot = taken;
+                console.warn('Inventory is full, cannot take items from barrel');
+            }
+            return;
+        }
+
+        // Slot is empty - get selected item from inventory or show dropdown
         const selectedItem = this.inventoryPanel.getSelectedItem();
 
         if (!selectedItem) {
             // No item selected - show dropdown menu
-            this.barrelInfoPanel.showItemDropdown(this.inventoryManager, (selectedItemId) => {
+            this.barrelInfoPanel.showItemDropdown((selectedItemId) => {
                 this.placeItemInBarrel(barrel, selectedItemId);
             });
             return;
@@ -273,43 +365,6 @@ export class WorldInteractionManager {
 
         // Item is selected - place it directly
         this.placeItemInBarrel(barrel, selectedItem.itemId);
-    }
-
-    onBarrelInputTakeClick(barrel) {
-        // Take items from input slot
-        const taken = barrel.takeFromInput();
-        if (!taken) {
-            console.warn('No items in input slot');
-            return;
-        }
-
-        // Add to inventory
-        if (this.inventoryManager.hasRoomFor(taken.itemId)) {
-            this.inventoryManager.addItem(taken.itemId, taken.count);
-
-            // Notify about new item
-            this.game.inventoryPanel.notifyItemAdded();
-
-            // Refresh inventory panel if visible
-            if (this.game.inventoryPanel.isVisible()) {
-                this.game.inventoryPanel.refresh();
-            }
-
-            // Refresh barrel panel to show updated slots
-            if (this.barrelInfoPanel.isVisible()) {
-                this.barrelInfoPanel.refresh();
-            }
-
-            // Update shop affordability
-            this.game.shopMenu.updateAffordability();
-
-            // Save state
-            this.game.stateManager.scheduleSave(this.game.getGameState());
-        } else {
-            // Put items back if inventory is full
-            barrel.inputSlot = taken;
-            console.warn('Inventory is full, cannot take items from barrel');
-        }
     }
 
     placeItemInBarrel(barrel, itemId) {
@@ -524,16 +579,45 @@ export class WorldInteractionManager {
             (destroyedFurnace) => this.destroyStructure(destroyedFurnace),
             (clickedFurnace) => this.onFurnaceSmeltSlotClick(clickedFurnace),
             (clickedFurnace) => this.onFurnaceFuelSlotClick(clickedFurnace),
-            (clickedFurnace) => this.onFurnaceOutputSlotClick(clickedFurnace)
+            (clickedFurnace) => this.onFurnaceOutputSlotClick(clickedFurnace),
+            this.inventoryManager
         );
     }
 
     onFurnaceSmeltSlotClick(furnace) {
+        // Check if slot has items (taking out)
+        if (furnace.smeltSlot) {
+            // Take items from smelt slot
+            const taken = furnace.takeFromSmeltSlot();
+            if (!taken) return;
+
+            if (this.inventoryManager.hasRoomFor(taken.itemId)) {
+                this.inventoryManager.addItem(taken.itemId, taken.count);
+                this.game.inventoryPanel.notifyItemAdded();
+
+                if (this.game.inventoryPanel.isVisible()) {
+                    this.game.inventoryPanel.refresh();
+                }
+                if (this.furnaceInfoPanel.isVisible()) {
+                    this.furnaceInfoPanel.refresh();
+                }
+
+                this.game.shopMenu.updateAffordability();
+                this.game.stateManager.scheduleSave(this.game.getGameState());
+            } else {
+                // Put items back
+                furnace.smeltSlot = taken;
+                console.warn('Inventory is full');
+            }
+            return;
+        }
+
+        // Slot is empty - check for selected item or show dropdown
         const selectedItem = this.inventoryPanel.getSelectedItem();
 
         if (!selectedItem) {
             // No item selected - show dropdown menu
-            this.furnaceInfoPanel.showSmeltDropdown(this.inventoryManager, (selectedItemId) => {
+            this.furnaceInfoPanel.showSmeltDropdown((selectedItemId) => {
                 this.placeItemInFurnaceSmeltSlot(furnace, selectedItemId);
             });
             return;
@@ -573,11 +657,39 @@ export class WorldInteractionManager {
     }
 
     onFurnaceFuelSlotClick(furnace) {
+        // Check if slot has items (taking out)
+        if (furnace.fuelSlot) {
+            // Take items from fuel slot
+            const taken = furnace.takeFromFuelSlot();
+            if (!taken) return;
+
+            if (this.inventoryManager.hasRoomFor(taken.itemId)) {
+                this.inventoryManager.addItem(taken.itemId, taken.count);
+                this.game.inventoryPanel.notifyItemAdded();
+
+                if (this.game.inventoryPanel.isVisible()) {
+                    this.game.inventoryPanel.refresh();
+                }
+                if (this.furnaceInfoPanel.isVisible()) {
+                    this.furnaceInfoPanel.refresh();
+                }
+
+                this.game.shopMenu.updateAffordability();
+                this.game.stateManager.scheduleSave(this.game.getGameState());
+            } else {
+                // Put items back
+                furnace.fuelSlot = taken;
+                console.warn('Inventory is full');
+            }
+            return;
+        }
+
+        // Slot is empty - check for selected item or show dropdown
         const selectedItem = this.inventoryPanel.getSelectedItem();
 
         if (!selectedItem) {
             // No item selected - show dropdown menu
-            this.furnaceInfoPanel.showFuelDropdown(this.inventoryManager, (selectedItemId) => {
+            this.furnaceInfoPanel.showFuelDropdown((selectedItemId) => {
                 this.placeItemInFurnaceFuelSlot(furnace, selectedItemId);
             });
             return;
@@ -787,121 +899,6 @@ export class WorldInteractionManager {
         tileX = Math.floor(tileX);
         tileY = Math.floor(tileY);
 
-        // Check if gloves are owned - allows painting items into barrel input slots
-        const hasGloves = this.game.player.ownedTools && this.game.player.ownedTools.includes('gloves');
-
-        if (hasGloves) {
-            // Check for barrel at this position
-            const entity = this.game.entities.find(e =>
-                Math.floor(e.x) === tileX && Math.floor(e.y) === tileY
-            );
-
-            if (entity && entity.type === 'barrel') {
-                const barrel = entity;
-
-                // Check if this item can be fermented
-                const recipe = GameConfig.FERMENTATION.RECIPES[itemId];
-                if (!recipe) return false; // Not a fermentable item
-
-                const maxStackSize = this.game.player.maxStackSize;
-
-                // If barrel has a different item type in input, can't add
-                if (barrel.inputSlot && barrel.inputSlot.itemId !== itemId) {
-                    return false;
-                }
-
-                // Calculate how many items we can add
-                const currentCount = barrel.inputSlot ? barrel.inputSlot.count : 0;
-                const capacity = maxStackSize - currentCount;
-
-                if (capacity <= 0) {
-                    return false; // Barrel input is full
-                }
-
-                // Add one item to barrel input slot
-                if (!barrel.inputSlot) {
-                    barrel.inputSlot = { itemId, count: 1 };
-                } else {
-                    barrel.inputSlot.count += 1;
-                }
-
-                // Update barrel's max stack size
-                barrel.maxStackSize = maxStackSize;
-
-                // Start fermentation if not already fermenting
-                if (!barrel.isFermenting()) {
-                    barrel.startFermentation(recipe.output, recipe.time);
-                }
-
-                // Remove item from inventory
-                this.inventoryManager.removeItem(itemId, 1);
-
-                // Refresh inventory panel
-                this.inventoryPanel.refresh();
-
-                // Check if there are still items of this type for selection persistence
-                const remainingCount = this.inventoryManager.getItemCount(itemId);
-                if (remainingCount === 0) {
-                    // No more items of this type, clear selection
-                    this.inventoryPanel.clearSelection();
-                } else {
-                    // Find the first slot with this itemId
-                    const newSlotIndex = this.inventoryManager.slots.findIndex(s => s && s.itemId === itemId);
-                    if (newSlotIndex !== -1) {
-                        // Update selection to the new slot
-                        this.inventoryPanel.selectedSlotIndex = newSlotIndex;
-                        const slot = this.inventoryManager.slots[newSlotIndex];
-
-                        const onSell = () => {
-                            const item = this.itemRegistry.getItem(slot.itemId);
-                            if (item && item.salePrice > 0) {
-                                this.inventoryManager.removeItem(slot.itemId, 1);
-                                this.game.addMoney(item.salePrice);
-
-                                const remainingCount = this.inventoryManager.getItemCount(slot.itemId);
-                                if (remainingCount === 0) {
-                                    this.inventoryPanel.clearSelection();
-                                } else {
-                                    this.inventoryPanel.refresh();
-                                    this.inventoryPanel.previewPanel.show(slot.itemId, onSell, onSellAll);
-                                }
-                            }
-                        };
-
-                        const onSellAll = () => {
-                            const item = this.itemRegistry.getItem(slot.itemId);
-                            if (item && item.salePrice > 0) {
-                                const totalCount = this.inventoryManager.getItemCount(slot.itemId);
-                                const totalValue = totalCount * item.salePrice;
-                                this.inventoryManager.removeItem(slot.itemId, totalCount);
-                                this.game.addMoney(totalValue);
-                                this.inventoryPanel.clearSelection();
-                                this.inventoryPanel.refresh();
-                            }
-                        };
-
-                        this.inventoryPanel.previewPanel.show(slot.itemId, onSell, onSellAll);
-                    } else {
-                        // Shouldn't happen, but clear selection just in case
-                        this.inventoryPanel.clearSelection();
-                    }
-                }
-
-                // Refresh barrel panel if visible
-                if (this.barrelInfoPanel.isVisible()) {
-                    this.barrelInfoPanel.refresh();
-                }
-
-                // Update shop affordability
-                this.game.shopMenu.updateAffordability();
-
-                // Save state
-                this.game.stateManager.scheduleSave(this.game.getGameState());
-
-                return true;
-            }
-        }
-
         // Validate item is placeable
         if (item.itemType !== 'seed' && item.itemType !== 'structure' && item.itemType !== 'npc') return false;
 
@@ -1025,136 +1022,14 @@ export class WorldInteractionManager {
         tileX = Math.floor(tileX);
         tileY = Math.floor(tileY);
 
-        // Find entity at this tile position
-        const entity = this.game.entities.find(e =>
-            Math.floor(e.x) === tileX && Math.floor(e.y) === tileY
-        );
-
+        // Find entity at this tile position (supports multi-tile entities)
+        const entity = this.getEntityAtTile(tileX, tileY);
         if (!entity) return false;
 
-        // Handle gloves tool for gathering fruits and fermented items
-        if (tool === 'gloves') {
-            // Check for fruiting plant with fruit
-            if (entity.type === 'plant' && entity.isFruitingPlant && entity.isFruitingPlant() && entity.hasFruit()) {
-                const fruit = entity.takeFruit();
-                if (!fruit) return false;
+        // Gloves are now handled by tryCollectOutput() in the painting system
+        // This method only handles scissors and saw tools
 
-                // Check if inventory has room
-                if (!this.inventoryManager.hasRoomFor(fruit.itemId)) {
-                    // Put fruit back
-                    entity.fruitSlot = fruit;
-                    return false;
-                }
-
-                // Add fruit to inventory
-                this.inventoryManager.addItem(fruit.itemId, fruit.count);
-
-                // Refresh UI
-                if (this.inventoryPanel.isVisible()) {
-                    this.inventoryPanel.refresh();
-                }
-                this.inventoryPanel.notifyItemAdded();
-                this.game.shopMenu.updateAffordability();
-                this.game.stateManager.scheduleSave(this.game.getGameState());
-
-                return true;
-            }
-
-            // Check for barrel with output
-            if (entity.type === 'barrel' && entity.outputSlot) {
-                const output = entity.takeFromOutput();
-                if (!output) return false;
-
-                // Check if inventory has room
-                if (!this.inventoryManager.hasRoomFor(output.itemId)) {
-                    // Put output back
-                    entity.outputSlot = output;
-                    return false;
-                }
-
-                // Add output to inventory
-                this.inventoryManager.addItem(output.itemId, output.count);
-
-                // Refresh UI
-                if (this.inventoryPanel.isVisible()) {
-                    this.inventoryPanel.refresh();
-                }
-                this.inventoryPanel.notifyItemAdded();
-                this.game.shopMenu.updateAffordability();
-                this.game.stateManager.scheduleSave(this.game.getGameState());
-
-                return true;
-            }
-
-            // Check for mine with output
-            if (entity.type === 'mine') {
-                // Try to take from any non-empty slot
-                for (let i = 0; i < entity.outputSlots.length; i++) {
-                    if (entity.outputSlots[i]) {
-                        const output = entity.takeFromSlot(i);
-                        if (!output) continue;
-
-                        // Check if inventory has room
-                        if (!this.inventoryManager.hasRoomFor(output.itemId)) {
-                            // Put output back
-                            entity.outputSlots[i] = output;
-                            continue;
-                        }
-
-                        // Add output to inventory
-                        this.inventoryManager.addItem(output.itemId, output.count);
-
-                        // Refresh UI
-                        if (this.inventoryPanel.isVisible()) {
-                            this.inventoryPanel.refresh();
-                        }
-                        this.inventoryPanel.notifyItemAdded();
-                        this.game.shopMenu.updateAffordability();
-                        this.game.stateManager.scheduleSave(this.game.getGameState());
-
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-            // Check for NPC with item
-            if (entity.type === 'npc' && entity.itemSlot) {
-                const output = entity.takeItem();
-                if (!output) return false;
-
-                // Check if inventory has room
-                if (!this.inventoryManager.hasRoomFor(output.itemId)) {
-                    // Put output back
-                    entity.itemSlot = output;
-                    return false;
-                }
-
-                // Add output to inventory
-                this.inventoryManager.addItem(output.itemId, output.count);
-
-                // Unlock gloves tool (first time collecting output)
-                if (!this.game.player.hasCollectedOutput) {
-                    this.game.player.hasCollectedOutput = true;
-                    this.game.checkToolUnlocks();
-                }
-
-                // Refresh UI
-                if (this.inventoryPanel.isVisible()) {
-                    this.inventoryPanel.refresh();
-                }
-                this.inventoryPanel.notifyItemAdded();
-                this.game.shopMenu.updateAffordability();
-                this.game.stateManager.scheduleSave(this.game.getGameState());
-
-                return true;
-            }
-
-            // Gloves tool doesn't work on anything else
-            return false;
-        }
-
-        // Must be a plant to harvest (for non-gloves tools)
+        // Must be a plant to harvest
         if (entity.type !== 'plant') return false;
 
         const plant = entity;
@@ -1214,6 +1089,205 @@ export class WorldInteractionManager {
 
         // Update shop affordability
         this.game.shopMenu.updateAffordability();
+
+        // Save state
+        this.game.stateManager.scheduleSave(this.game.getGameState());
+
+        return true;
+    }
+
+    getEntityAtTile(tileX, tileY) {
+        // Find entity at tile position, accounting for multi-tile entities
+        // Returns the entity or null if no entity found
+        return this.game.entities.find(e => {
+            const entityX = Math.floor(e.x);
+            const entityY = Math.floor(e.y);
+            const entityWidth = e.width || 1;
+            const entityHeight = e.height || 1;
+
+            // Check if tile is within entity's bounding box
+            return tileX >= entityX && tileX < entityX + entityWidth &&
+                   tileY >= entityY && tileY < entityY + entityHeight;
+        });
+    }
+
+    tryPaintIntoSlot(tileX, tileY) {
+        // Try to paint selected inventory item into entity slot using gloves
+        // Returns true if painting succeeded, false otherwise
+
+        console.log(`[Painting] tryPaintIntoSlot called at (${tileX}, ${tileY})`);
+
+        // Require inventory item to be selected
+        const selectedItem = this.inventoryPanel.getSelectedItem();
+        console.log(`[Painting] selectedItem:`, selectedItem);
+        if (!selectedItem) {
+            console.log(`[Painting] No item selected, exiting`);
+            return false;
+        }
+
+        // Require NO tool to be selected (item selection is mutually exclusive with tool selection)
+        const selectedTool = this.toolsPanel ? this.toolsPanel.getSelectedTool() : null;
+        console.log(`[Painting] selectedTool:`, selectedTool);
+        if (selectedTool) {
+            console.log(`[Painting] Tool is selected, cannot paint items (mutually exclusive)`);
+            return false;
+        }
+
+        // Require gloves to be owned (not selected - that's for collecting outputs)
+        const hasGloves = this.game.player.ownedTools && this.game.player.ownedTools.includes('gloves');
+        console.log(`[Painting] hasGloves:`, hasGloves);
+        if (!hasGloves) {
+            console.log(`[Painting] Gloves not owned, cannot paint into slots`);
+            return false;
+        }
+
+        // Ensure tile coordinates are integers
+        tileX = Math.floor(tileX);
+        tileY = Math.floor(tileY);
+
+        // Find entity at this tile position (supports multi-tile entities)
+        const entity = this.getEntityAtTile(tileX, tileY);
+        if (!entity) return false;
+
+        console.log(`[Painting] Found entity: ${entity.type}, item: ${selectedItem.itemId}`);
+
+        // Check if entity has painting interface
+        if (!entity.acceptsItemInSlot || !entity.placeItemInSlot) {
+            console.log(`[Painting] Entity ${entity.type} does not have painting interface`);
+            return false;
+        }
+
+        // Check if entity accepts this item
+        const slotType = entity.acceptsItemInSlot(selectedItem.itemId, this.itemRegistry);
+        console.log(`[Painting] Entity ${entity.type} acceptsItemInSlot returned: ${slotType}`);
+        if (!slotType) {
+            return false;
+        }
+
+        // Try to place one item into the slot
+        const success = entity.placeItemInSlot(
+            selectedItem.itemId,
+            slotType,
+            1,  // Place one at a time during painting
+            this.game.player.maxStackSize,
+            this.itemRegistry
+        );
+
+        console.log(`[Painting] placeItemInSlot returned: ${success}`);
+
+        if (success) {
+            // Remove one item from inventory
+            this.inventoryManager.removeItem(selectedItem.itemId, 1);
+
+            // Check if that was the last item of this type and clear selection if so
+            const remainingCount = this.inventoryManager.getItemCount(selectedItem.itemId);
+            if (remainingCount === 0) {
+                this.inventoryPanel.clearSelection();
+            }
+
+            // Refresh inventory panel if visible
+            if (this.inventoryPanel.isVisible()) {
+                this.inventoryPanel.refresh();
+            }
+
+            // Update shop affordability
+            this.game.shopMenu.updateAffordability();
+
+            // Save state
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+
+            return true;
+        }
+
+        return false;
+    }
+
+    tryCollectOutput(tileX, tileY) {
+        // Try to collect output from entity using gloves (no item selected)
+        // Returns true if collection succeeded, false otherwise
+
+        // Require gloves tool to be selected
+        const selectedTool = this.toolsPanel ? this.toolsPanel.getSelectedTool() : null;
+        if (selectedTool !== 'gloves') {
+            return false;
+        }
+
+        // Require NO item to be selected
+        const selectedItem = this.inventoryPanel.getSelectedItem();
+        if (selectedItem) {
+            return false;
+        }
+
+        // Ensure tile coordinates are integers
+        tileX = Math.floor(tileX);
+        tileY = Math.floor(tileY);
+
+        // Find entity at this tile position (supports multi-tile entities)
+        const entity = this.getEntityAtTile(tileX, tileY);
+        if (!entity) return false;
+
+        // Check if entity has output collection interface
+        if (!entity.hasOutputToCollect || !entity.collectFirstOutput) {
+            return false;
+        }
+
+        // Check if entity has output to collect
+        if (!entity.hasOutputToCollect()) {
+            return false;
+        }
+
+        // Note: We can't check inventory space before collecting because we don't know
+        // what item will be collected without actually calling collectFirstOutput().
+        // We'll just fail if inventory is full - the items stay in the entity.
+
+        // Try to collect the output
+        const collected = entity.collectFirstOutput();
+        if (!collected) {
+            return false;
+        }
+
+        // Check if inventory has room for the collected items
+        if (!this.inventoryManager.hasRoomFor(collected.itemId)) {
+            // Can't add to inventory - need to put items back
+            // We'll attempt to restore them to the entity
+            if (entity.type === 'barrel' || entity.type === 'furnace') {
+                // Restore to output slot
+                entity.outputSlot = collected;
+            } else if (entity.type === 'plant') {
+                // Restore to fruit slot
+                entity.fruitSlot = collected;
+            } else if (entity.type === 'mine') {
+                // Find the appropriate slot to restore to
+                if (collected.itemId === 'rock') {
+                    entity.outputSlots[0] = collected;
+                } else if (collected.itemId === 'ore') {
+                    entity.outputSlots[1] = collected;
+                } else if (collected.itemId === 'coal') {
+                    entity.outputSlots[2] = collected;
+                }
+            } else if (entity.type === 'npc') {
+                // Restore to item slot
+                entity.itemSlot = collected;
+            }
+            return false;
+        }
+
+        // Add collected items to inventory
+        this.inventoryManager.addItem(collected.itemId, collected.count);
+
+        // Refresh inventory panel if visible
+        if (this.inventoryPanel.isVisible()) {
+            this.inventoryPanel.refresh();
+        }
+
+        // Notify inventory about new item
+        this.inventoryPanel.notifyItemAdded();
+
+        // Update shop affordability
+        this.game.shopMenu.updateAffordability();
+
+        // Check tool unlocks (e.g., first fruit collection)
+        this.game.checkToolUnlocks();
 
         // Save state
         this.game.stateManager.scheduleSave(this.game.getGameState());

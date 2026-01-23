@@ -1,15 +1,22 @@
 import { Button } from '../ui/Button.js';
 import { Modal } from '../ui/Modal.js';
+import { ItemSlot } from '../ui/ItemSlot.js';
+import { UIComponentTheme } from '../config/UIComponentTheme.js';
 
 export class MineInfoPanel {
-    constructor(itemRegistry) {
+    constructor(itemRegistry, assetLoader) {
         this.itemRegistry = itemRegistry;
+        this.assetLoader = assetLoader;
         this.panel = null;
         this.visible = false;
         this.currentMine = null;
         this.onMineCallback = null;
         this.onDestroyCallback = null;
         this.onSlotClickCallback = null;
+
+        // Component instances
+        this.outputSlots = [];
+
         this.createPanel();
     }
 
@@ -91,6 +98,7 @@ export class MineInfoPanel {
         mineBtnElement.addEventListener('pointerdown', (e) => {
             e.stopPropagation();  // Prevent panel from closing
         });
+        mineBtnElement.style.width = UIComponentTheme.PANEL.BUTTON.WIDTH;
 
         // Create button container for centering
         const mineButtonContainer = document.createElement('div');
@@ -98,7 +106,7 @@ export class MineInfoPanel {
         mineButtonContainer.appendChild(mineBtnElement);
         this.panel.appendChild(mineButtonContainer);
 
-        // Output slots
+        // Output slots using ItemSlot component
         const slotsContainer = document.createElement('div');
         slotsContainer.className = 'mine-slots';
         slotsContainer.style.cssText = `
@@ -110,6 +118,8 @@ export class MineInfoPanel {
 
         // Create 3 output slots
         const slotLabels = ['Rock', 'Ore', 'Coal'];
+        this.outputSlots = [];
+
         for (let i = 0; i < 3; i++) {
             const slotWrapper = document.createElement('div');
             slotWrapper.style.cssText = `
@@ -124,9 +134,24 @@ export class MineInfoPanel {
             slotLabel.style.fontSize = '10px';
             slotLabel.style.color = '#888';
 
-            const slot = this.createSlot(mine.outputSlots[i], i);
+            // Create ItemSlot component
+            const itemSlot = new ItemSlot('medium', mine.outputSlots[i], this.itemRegistry, this.assetLoader, {
+                isOutput: true,
+                clickable: true,
+                onSlotClick: (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (mine.outputSlots[i] && this.onSlotClickCallback) {
+                        this.onSlotClickCallback(this.currentMine, i);
+                        this.refresh();
+                    }
+                }
+            });
+
+            this.outputSlots.push(itemSlot);
+
             slotWrapper.appendChild(slotLabel);
-            slotWrapper.appendChild(slot);
+            slotWrapper.appendChild(itemSlot.getElement());
             slotsContainer.appendChild(slotWrapper);
         }
 
@@ -134,8 +159,12 @@ export class MineInfoPanel {
 
         // Destroy button
         const destroyBtn = new Button('Destroy', '💥', () => {
-            this.showDestroyConfirmation();
+            if (this.onDestroyCallback) {
+                this.onDestroyCallback(this.currentMine);
+            }
+            this.hide();
         }, 'danger');
+        destroyBtn.getElement().style.width = UIComponentTheme.PANEL.BUTTON.WIDTH;
 
         // Create button container for centering
         const destroyButtonContainer = document.createElement('div');
@@ -144,96 +173,16 @@ export class MineInfoPanel {
         this.panel.appendChild(destroyButtonContainer);
     }
 
-    createSlot(slotData, slotIndex) {
-        const slot = document.createElement('div');
-        slot.className = 'barrel-slot';
-        slot.style.cssText = `
-            width: 60px;
-            height: 60px;
-            border: 2px solid #444;
-            border-radius: 4px;
-            background-color: #222;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            cursor: pointer;
-        `;
-
-        if (slotData) {
-            const slotItem = this.itemRegistry.getItem(slotData.itemId);
-            if (slotItem) {
-                if (slotItem.image) {
-                    const img = document.createElement('img');
-                    img.src = `./assets/${slotItem.image}`;
-                    img.alt = slotItem.name;
-                    img.style.width = '50px';
-                    img.style.height = '50px';
-                    img.style.objectFit = 'contain';
-                    slot.appendChild(img);
-                } else {
-                    slot.textContent = slotItem.emoji;
-                    slot.style.fontSize = '40px';
-                }
-
-                // Add count badge
-                if (slotData.count > 1) {
-                    const countBadge = document.createElement('div');
-                    countBadge.className = 'count-badge';
-                    countBadge.textContent = slotData.count;
-                    countBadge.style.cssText = `
-                        position: absolute;
-                        bottom: 2px;
-                        right: 2px;
-                        background-color: #000;
-                        color: #fff;
-                        border-radius: 8px;
-                        padding: 2px 5px;
-                        font-size: 10px;
-                        font-weight: bold;
-                    `;
-                    slot.appendChild(countBadge);
-                }
-            }
-        }
-
-        // Add click handler
-        slot.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (slotData && this.onSlotClickCallback) {
-                this.onSlotClickCallback(this.currentMine, slotIndex);
-                this.refresh();
-            }
-        });
-
-        return slot;
-    }
-
-    showDestroyConfirmation() {
-        const modal = new Modal();
-        modal.setTitle('Destroy Mine?');
-        modal.setMessage('Are you sure? All materials will be lost.');
-
-        const confirmBtn = new Button('Confirm', '✓', () => {
-            if (this.onDestroyCallback) {
-                this.onDestroyCallback(this.currentMine);
-            }
-            modal.hide();
-            this.hide();
-        }, 'danger');
-
-        const cancelBtn = new Button('Cancel', '✗', () => {
-            modal.hide();
-        }, 'secondary');
-
-        modal.addButton(confirmBtn);
-        modal.addButton(cancelBtn);
-        modal.show();
-    }
-
     refresh() {
-        if (this.visible && this.currentMine) {
-            this.buildPanel();
+        if (!this.visible || !this.currentMine) return;
+
+        const mine = this.currentMine;
+
+        // Update slot contents using ItemSlot.updateContents()
+        for (let i = 0; i < this.outputSlots.length; i++) {
+            if (this.outputSlots[i]) {
+                this.outputSlots[i].updateContents(mine.outputSlots[i]);
+            }
         }
     }
 

@@ -1,13 +1,17 @@
 import { Button } from '../ui/Button.js';
+import { ItemSlot } from '../ui/ItemSlot.js';
+import { UIComponentTheme } from '../config/UIComponentTheme.js';
 
 export class PlantInfoPanel {
-    constructor(itemRegistry, game) {
+    constructor(itemRegistry, game, assetLoader) {
         this.itemRegistry = itemRegistry;
         this.game = game;
+        this.assetLoader = assetLoader;
         this.panel = null;
         this.visible = false;
         this.currentPlant = null;
         this.onHarvestCallback = null;
+        this.fruitSlot = null;
         this.createPanel();
     }
 
@@ -78,10 +82,12 @@ export class PlantInfoPanel {
             if (hasFruit) {
                 // Show disabled button - must take fruit first
                 const disabledBtn = new Button('Take fruit first', '🔒', null, 'disabled');
+                disabledBtn.getElement().style.width = UIComponentTheme.PANEL.BUTTON.WIDTH;
                 buttonContainer.appendChild(disabledBtn.getElement());
             } else if (requiresTool && !hasTool) {
                 // Show disabled button with "Tool required" text
                 const disabledBtn = new Button('Tool required', '🔒', null, 'disabled');
+                disabledBtn.getElement().style.width = UIComponentTheme.PANEL.BUTTON.WIDTH;
                 buttonContainer.appendChild(disabledBtn.getElement());
             } else {
                 // Determine harvest emoji based on plant type
@@ -98,6 +104,7 @@ export class PlantInfoPanel {
                     }
                     this.hide();
                 }, 'success');
+                harvestBtn.getElement().style.width = UIComponentTheme.PANEL.BUTTON.WIDTH;
                 buttonContainer.appendChild(harvestBtn.getElement());
             }
 
@@ -112,68 +119,31 @@ export class PlantInfoPanel {
     }
 
     addFruitSlot(plant) {
-        const slotContainer = document.createElement('div');
-        slotContainer.className = 'plant-fruit-slot-container';
-        slotContainer.style.cssText = 'margin: 12px 0; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px;';
+        // Simple container for centering
+        const slotWrapper = document.createElement('div');
+        slotWrapper.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 12px 0;';
 
         const slotLabel = document.createElement('div');
         slotLabel.textContent = 'Fruit:';
-        slotLabel.style.cssText = 'font-size: 12px; color: #aaa; margin-bottom: 4px;';
+        slotLabel.style.cssText = 'font-size: 12px; color: #aaa;';
 
-        const slot = document.createElement('div');
-        slot.className = 'fruit-slot';
-        slot.style.cssText = 'width: 60px; height: 60px; background: rgba(0,0,0,0.3); border: 2px solid #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; margin-bottom: 8px;';
-
-        // Add fruit icon if present
-        if (plant.fruitSlot && plant.fruitSlot.itemId) {
-            const fruitItem = this.itemRegistry.getItem(plant.fruitSlot.itemId);
-            if (fruitItem) {
-                const fruitIcon = document.createElement('div');
-                fruitIcon.textContent = fruitItem.emoji;
-                fruitIcon.style.cssText = 'font-size: 32px;';
-                slot.appendChild(fruitIcon);
-
-                // Add count badge
-                if (plant.fruitSlot.count > 1) {
-                    const countBadge = document.createElement('div');
-                    countBadge.textContent = plant.fruitSlot.count;
-                    countBadge.style.cssText = 'position: absolute; bottom: 2px; right: 2px; background: #333; color: white; font-size: 12px; padding: 2px 4px; border-radius: 3px; font-weight: bold;';
-                    slot.appendChild(countBadge);
+        // Create ItemSlot component for fruit (clickable to take)
+        this.fruitSlot = new ItemSlot('medium', plant.fruitSlot, this.itemRegistry, this.assetLoader, {
+            isOutput: true,
+            clickable: true,
+            onSlotClick: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (plant.fruitSlot && this.onTakeFruitCallback) {
+                    this.onTakeFruitCallback(plant);
                 }
-            }
-        } else {
-            // Empty slot
-            const emptyText = document.createElement('div');
-            emptyText.textContent = '—';
-            emptyText.style.cssText = 'color: #555; font-size: 24px;';
-            slot.appendChild(emptyText);
-        }
-
-        // Add click handler for taking fruit
-        slot.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (plant.fruitSlot && this.onTakeFruitCallback) {
-                this.onTakeFruitCallback(plant);
             }
         });
 
-        // Add take button
-        const takeButton = new Button('Take', '🫴', () => {
-            if (plant.fruitSlot && this.onTakeFruitCallback) {
-                this.onTakeFruitCallback(plant);
-            }
-        }, 'primary');
+        slotWrapper.appendChild(slotLabel);
+        slotWrapper.appendChild(this.fruitSlot.getElement());
 
-        // Disable if no fruit
-        if (!plant.fruitSlot) {
-            takeButton.setEnabled(false);
-        }
-
-        slotContainer.appendChild(slotLabel);
-        slotContainer.appendChild(slot);
-        slotContainer.appendChild(takeButton.getElement());
-
-        this.panel.appendChild(slotContainer);
+        this.panel.appendChild(slotWrapper);
     }
 
     positionPanel(tileScreenX, tileScreenY) {
@@ -212,6 +182,7 @@ export class PlantInfoPanel {
         this.visible = false;
         this.currentPlant = null;
         this.onHarvestCallback = null;
+        this.fruitSlot = null;
     }
 
     isVisible() {
