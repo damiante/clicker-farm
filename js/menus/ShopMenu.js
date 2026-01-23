@@ -154,8 +154,25 @@ export class ShopMenu {
                 if (requiredItem) {
                     const reqSpan = document.createElement('span');
                     reqSpan.className = 'requirement';
-                    reqSpan.textContent = `${requiredItem.emoji || '?'} ${requiredCount}`;
                     reqSpan.title = `${requiredCount}x ${requiredItem.name}`;
+
+                    // Handle image-based items vs emoji items
+                    if (requiredItem.image) {
+                        const img = document.createElement('img');
+                        img.src = `./assets/${requiredItem.image}`;
+                        img.alt = requiredItem.name;
+                        img.style.width = '16px';
+                        img.style.height = '16px';
+                        img.style.objectFit = 'contain';
+                        img.style.verticalAlign = 'middle';
+                        img.style.marginRight = '2px';
+                        reqSpan.appendChild(img);
+
+                        const countText = document.createTextNode(` ${requiredCount}`);
+                        reqSpan.appendChild(countText);
+                    } else {
+                        reqSpan.textContent = `${requiredItem.emoji || '?'} ${requiredCount}`;
+                    }
 
                     // Add hover to show item description
                     reqSpan.addEventListener('pointerenter', (e) => {
@@ -270,8 +287,19 @@ export class ShopMenu {
                 this.game.toolsPanel.refresh();
                 this.game.toolsPanel.notifyToolPurchased();
             }
+        } else if (item.directPlacement) {
+            // Direct placement items (mine, farmer) - add to inventory and auto-select for immediate placement
+            if (this.inventoryManager.addItem(item.id)) {
+                // Auto-select the item for placement
+                const slotIndex = this.inventoryManager.slots.findIndex(s => s && s.itemId === item.id);
+                if (slotIndex !== -1) {
+                    this.game.inventoryPanel.selectSlotForPlacement(slotIndex);
+                }
+                // Notify about new item
+                this.game.inventoryPanel.notifyItemAdded();
+            }
         } else {
-            // Add to inventory (non-tools)
+            // Add to inventory (normal items)
             if (this.inventoryManager.addItem(item.id)) {
                 // Notify about new item (shows pulse if inventory closed)
                 this.game.inventoryPanel.notifyItemAdded();

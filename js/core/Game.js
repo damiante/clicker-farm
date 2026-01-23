@@ -17,6 +17,11 @@ import { WorldInteractionManager } from '../systems/WorldInteractionManager.js';
 import { Plant } from '../entities/Plant.js';
 import { Fence } from '../entities/Fence.js';
 import { Barrel } from '../entities/Barrel.js';
+import { Mine } from '../entities/Mine.js';
+import { Furnace } from '../entities/Furnace.js';
+import { Crate } from '../entities/Crate.js';
+import { NPC } from '../entities/NPC.js';
+import { FarmerBehavior } from '../entities/behaviors/FarmerBehavior.js';
 
 export class Game {
     constructor() {
@@ -230,6 +235,27 @@ export class Game {
             } else if (entityData.type === 'barrel') {
                 const barrel = Barrel.deserialize(entityData);
                 this.entities.push(barrel);
+            } else if (entityData.type === 'mine') {
+                const mine = Mine.deserialize(entityData);
+                this.entities.push(mine);
+            } else if (entityData.type === 'furnace') {
+                const furnace = Furnace.deserialize(entityData);
+                this.entities.push(furnace);
+            } else if (entityData.type === 'crate') {
+                const crate = Crate.deserialize(entityData);
+                this.entities.push(crate);
+            } else if (entityData.type === 'npc') {
+                // Create behavior based on NPC type
+                let behavior = null;
+                if (entityData.npcType === 'farmer') {
+                    behavior = new FarmerBehavior(this);
+                }
+                const npc = NPC.deserialize(entityData, behavior);
+
+                // Set walkable callback for pathfinding
+                npc.setIsWalkableCallback((x, y) => this.isWalkable(x, y));
+
+                this.entities.push(npc);
             }
         }
 
@@ -461,6 +487,96 @@ export class Game {
 
         this.stateManager.scheduleSave(this.getGameState());
         return barrel;
+    }
+
+    createMineEntity(itemId, tileX, tileY) {
+        const item = this.itemRegistry.getItem(itemId);
+        if (!item || item.itemType !== 'structure') {
+            console.error('Can only create structures');
+            return null;
+        }
+
+        const mine = new Mine(tileX, tileY, itemId);
+        this.entities.push(mine);
+
+        this.stateManager.scheduleSave(this.getGameState());
+        return mine;
+    }
+
+    createFurnaceEntity(itemId, tileX, tileY) {
+        const item = this.itemRegistry.getItem(itemId);
+        if (!item || item.itemType !== 'structure') {
+            console.error('Can only create structures');
+            return null;
+        }
+
+        const furnace = new Furnace(tileX, tileY, itemId);
+        this.entities.push(furnace);
+
+        this.stateManager.scheduleSave(this.getGameState());
+        return furnace;
+    }
+
+    createCrateEntity(itemId, tileX, tileY) {
+        const item = this.itemRegistry.getItem(itemId);
+        if (!item || item.itemType !== 'structure') {
+            console.error('Can only create structures');
+            return null;
+        }
+
+        const crate = new Crate(tileX, tileY, itemId);
+        this.entities.push(crate);
+
+        this.stateManager.scheduleSave(this.getGameState());
+        return crate;
+    }
+
+    /**
+     * Check if tile is walkable for NPCs
+     * Walkable = grass tile with no entity occupying it
+     */
+    isWalkable(x, y) {
+        // Check if tile exists and is grass
+        const tile = this.chunkManager.getTile(Math.floor(x), Math.floor(y));
+        if (!tile || tile.type !== 'grass') {
+            return false;
+        }
+
+        // Check if any entity occupies this tile
+        for (const entity of this.entities) {
+            // Check entity bounds
+            const entityWidth = entity.width || 1;
+            const entityHeight = entity.height || 1;
+
+            // Check if (x,y) is within entity's bounding box
+            const ex = Math.floor(entity.x);
+            const ey = Math.floor(entity.y);
+
+            if (x >= ex && x < ex + entityWidth && y >= ey && y < ey + entityHeight) {
+                return false;  // Tile occupied by entity
+            }
+        }
+
+        return true;
+    }
+
+    createFarmerEntity(itemId, tileX, tileY) {
+        const item = this.itemRegistry.getItem(itemId);
+        if (!item || item.itemType !== 'npc') {
+            console.error('Can only create NPCs');
+            return null;
+        }
+
+        const behavior = new FarmerBehavior(this);
+        const farmer = new NPC(tileX, tileY, 'farmer', itemId, behavior);
+
+        // Set walkable callback for pathfinding
+        farmer.setIsWalkableCallback((x, y) => this.isWalkable(x, y));
+
+        this.entities.push(farmer);
+
+        this.stateManager.scheduleSave(this.getGameState());
+        return farmer;
     }
 
     updateFenceOrientations() {

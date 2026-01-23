@@ -29,7 +29,13 @@ export class AssetLoader {
         const additionalAssets = [
             { id: 'fence-horizontal.png', asset: './assets/fence-horizontal.png' },
             { id: 'fence-vertical.png', asset: './assets/fence-vertical.png' },
-            { id: 'barrel.png', asset: './assets/barrel.png' }
+            { id: 'barrel.png', asset: './assets/barrel.png' },
+            { id: 'ore.png', asset: './assets/ore.png' },
+            { id: 'coal.png', asset: './assets/coal.png' },
+            { id: 'iron.png', asset: './assets/iron.png' },
+            { id: 'furnace-off.png', asset: './assets/furnace-off.png' },
+            { id: 'furnace-on.png', asset: './assets/furnace-on.png' },
+            { id: 'crate.png', asset: './assets/crate.png' }
         ];
 
         this.totalCount = tileAssets.length + additionalAssets.length;

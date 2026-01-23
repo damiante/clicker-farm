@@ -116,11 +116,17 @@ export class Renderer {
             // Viewport culling - only render visible entities
             if (entity.x >= visibleStartX && entity.x <= visibleEndX &&
                 entity.y >= visibleStartY && entity.y <= visibleEndY) {
-                // Pass assetLoader for entities that need images (like fences and barrels)
-                if (entity.type === 'fence' || entity.type === 'barrel') {
+                // Render entity based on type
+                if (entity.type === 'fence' || entity.type === 'barrel' ||
+                    entity.type === 'furnace' || entity.type === 'crate') {
+                    // Image-only entities
                     entity.render(this.ctx, this.camera.x, this.camera.y, tileSize, this.assetLoader);
-                } else {
+                } else if (entity.type === 'plant') {
+                    // Plant needs only itemRegistry
                     entity.render(this.ctx, this.camera.x, this.camera.y, tileSize, itemRegistry);
+                } else if (entity.type === 'mine' || entity.type === 'npc') {
+                    // Mine and NPC need both assetLoader and itemRegistry
+                    entity.render(this.ctx, this.camera.x, this.camera.y, tileSize, this.assetLoader, itemRegistry);
                 }
 
                 // Render overlay icons if entity has any

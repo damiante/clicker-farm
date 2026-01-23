@@ -297,5 +297,99 @@
     "salePrice": 75.00,
     "itemType": "resource",
     "overworldScale": 0.7
+  },
+  "rock": {
+    "id": "rock",
+    "name": "Rock",
+    "emoji": "🪨",
+    "description": "A solid piece of stone",
+    "salePrice": 2.00,
+    "itemType": "resource",
+    "overworldScale": 0.6
+  },
+  "ore": {
+    "id": "ore",
+    "name": "Ore",
+    "image": "ore.png",
+    "description": "Raw ore ready for smelting",
+    "salePrice": 5.00,
+    "itemType": "resource",
+    "overworldScale": 0.6
+  },
+  "coal": {
+    "id": "coal",
+    "name": "Coal",
+    "image": "coal.png",
+    "description": "Burnable fuel for furnaces",
+    "salePrice": 3.00,
+    "itemType": "resource",
+    "overworldScale": 0.6
+  },
+  "brick": {
+    "id": "brick",
+    "name": "Brick",
+    "emoji": "🧱",
+    "description": "Smelted stone brick",
+    "salePrice": 4.00,
+    "itemType": "resource",
+    "overworldScale": 0.6
+  },
+  "iron": {
+    "id": "iron",
+    "name": "Iron",
+    "image": "iron.png",
+    "description": "Smelted iron ingot",
+    "salePrice": 10.00,
+    "itemType": "resource",
+    "overworldScale": 0.6
+  },
+  "mine": {
+    "id": "mine",
+    "name": "Mine",
+    "emoji": "⛰️",
+    "description": "Extract rocks, ore, and coal",
+    "salePrice": 100.00,
+    "itemType": "structure",
+    "overworldScale": 2.0,
+    "multiTile": {
+      "width": 2,
+      "height": 2
+    },
+    "directPlacement": true
+  },
+  "furnace": {
+    "id": "furnace",
+    "name": "Furnace",
+    "image": "furnace-off.png",
+    "description": "Smelt ore and rocks into materials",
+    "salePrice": 200.00,
+    "itemType": "structure",
+    "requirements": {
+      "rock": 5
+    },
+    "overworldScale": 0.8
+  },
+  "crate": {
+    "id": "crate",
+    "name": "Crate",
+    "image": "crate.png",
+    "description": "Store items in a 3x3 grid",
+    "salePrice": 500.00,
+    "itemType": "structure",
+    "requirements": {
+      "wood": 10,
+      "iron": 1
+    },
+    "overworldScale": 1.0
+  },
+  "farmer": {
+    "id": "farmer",
+    "name": "Farmer",
+    "emoji": "🧑‍🌾",
+    "description": "Harvests plants and stores them in crates",
+    "salePrice": 1000.00,
+    "itemType": "npc",
+    "overworldScale": 1.0,
+    "directPlacement": true
   }
 }

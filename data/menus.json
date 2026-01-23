@@ -6,15 +6,21 @@
     "items": ["sunflower_seed", "tree_seed", "rice_seed", "wheat_seed", "hyacinth_seed", "tulip_seed", "rose_seed", "grape_seed"]
   },
   {
+    "id": "structures",
+    "name": "Structures",
+    "emoji": "🚧",
+    "items": ["fence", "barrel", "mine", "furnace", "crate"]
+  },
+  {
+    "id": "workers",
+    "name": "Workers",
+    "emoji": "🧑‍🏭",
+    "items": ["farmer"]
+  },
+  {
     "id": "tools",
     "name": "Tools",
     "emoji": "🛠️",
     "items": ["scissors", "axe", "saw", "gloves"]
-  },
-  {
-    "id": "structures",
-    "name": "Structures",
-    "emoji": "🚧",
-    "items": ["fence", "barrel"]
   }
 ]

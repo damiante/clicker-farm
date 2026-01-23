@@ -159,20 +159,34 @@ export class Plant extends Entity {
         return overlays.length > 0 ? overlays : null;
     }
 
-    takeFruit() {
-        // Take all fruits from the fruit slot
+    takeFruit(count = null) {
+        // Take fruits from the fruit slot (count = null takes all)
         if (!this.fruitSlot) {
             return null;
         }
 
-        const taken = { ...this.fruitSlot };
-        this.fruitSlot = null;
+        if (count === null || count >= this.fruitSlot.count) {
+            // Take all fruits
+            const taken = { ...this.fruitSlot };
+            this.fruitSlot = null;
 
-        // Clear the timer - update() will schedule a new one on next frame
-        // This ensures at least baseTime delay before next fruit
-        this.nextFruitTime = null;
+            // Clear the timer - update() will schedule a new one on next frame
+            // This ensures at least baseTime delay before next fruit
+            this.nextFruitTime = null;
 
-        return taken;
+            return taken;
+        } else {
+            // Take partial amount
+            const taken = {
+                itemId: this.fruitSlot.itemId,
+                count: count
+            };
+
+            this.fruitSlot.count -= count;
+
+            // Don't clear timer - still have fruits remaining
+            return taken;
+        }
     }
 
     isFruitingPlant() {

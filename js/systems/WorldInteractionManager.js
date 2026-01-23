@@ -1,6 +1,10 @@
 import { PlantInfoPanel } from './PlantInfoPanel.js';
 import { FenceInfoPanel } from './FenceInfoPanel.js';
 import { BarrelInfoPanel } from './BarrelInfoPanel.js';
+import { MineInfoPanel } from './MineInfoPanel.js';
+import { FurnaceInfoPanel } from './FurnaceInfoPanel.js';
+import { CrateInfoPanel } from './CrateInfoPanel.js';
+import { NPCInfoPanel } from './NPCInfoPanel.js';
 import { GameConfig } from '../config/GameConfig.js';
 
 export class WorldInteractionManager {
@@ -15,6 +19,10 @@ export class WorldInteractionManager {
         this.plantInfoPanel = new PlantInfoPanel(itemRegistry, game);
         this.fenceInfoPanel = new FenceInfoPanel(itemRegistry);
         this.barrelInfoPanel = new BarrelInfoPanel(itemRegistry);
+        this.mineInfoPanel = new MineInfoPanel(itemRegistry);
+        this.furnaceInfoPanel = new FurnaceInfoPanel(itemRegistry);
+        this.crateInfoPanel = new CrateInfoPanel(itemRegistry);
+        this.npcInfoPanel = new NPCInfoPanel(itemRegistry);
 
         this.lastPointerDownPos = null;
         this.currentMousePos = null;  // Track mouse position for placement preview
@@ -159,9 +167,21 @@ export class WorldInteractionManager {
         }
 
         // Check if there's an entity at this position
-        const entity = this.game.entities.find(e =>
-            Math.floor(e.x) === tileX && Math.floor(e.y) === tileY
-        );
+        // Handle multi-tile entities (like 2x2 mine)
+        const entity = this.game.entities.find(e => {
+            const ex = Math.floor(e.x);
+            const ey = Math.floor(e.y);
+
+            // Check if entity occupies this tile
+            if (e.width && e.height) {
+                // Multi-tile entity
+                return tileX >= ex && tileX < ex + e.width &&
+                       tileY >= ey && tileY < ey + e.height;
+            } else {
+                // Single-tile entity
+                return ex === tileX && ey === tileY;
+            }
+        });
 
         if (entity) {
             if (entity.type === 'plant') {
@@ -170,6 +190,14 @@ export class WorldInteractionManager {
                 this.showFenceMenu(entity);
             } else if (entity.type === 'barrel') {
                 this.showBarrelMenu(entity);
+            } else if (entity.type === 'mine') {
+                this.showMineMenu(entity);
+            } else if (entity.type === 'furnace') {
+                this.showFurnaceMenu(entity);
+            } else if (entity.type === 'crate') {
+                this.showCrateMenu(entity);
+            } else if (entity.type === 'npc') {
+                this.showNPCMenu(entity);
             }
         }
     }
@@ -426,6 +454,324 @@ export class WorldInteractionManager {
         }
     }
 
+    showMineMenu(mine) {
+        const screenPos = this.renderer.worldToScreen(mine.x + 1, mine.y + 1); // Center of 2x2 mine
+
+        this.mineInfoPanel.show(
+            mine,
+            screenPos.x,
+            screenPos.y,
+            (clickedMine) => this.onMineClick(clickedMine),
+            (destroyedMine) => this.destroyStructure(destroyedMine),
+            (clickedMine, slotIndex) => this.onMineSlotClick(clickedMine, slotIndex)
+        );
+    }
+
+    onMineClick(mine) {
+        // Execute mine operation
+        const results = mine.mine();
+
+        // Refresh mine panel to show new items
+        if (this.mineInfoPanel.isVisible()) {
+            this.mineInfoPanel.refresh();
+        }
+
+        // Save state
+        this.game.stateManager.scheduleSave(this.game.getGameState());
+    }
+
+    onMineSlotClick(mine, slotIndex) {
+        // Take items from mine output slot
+        const taken = mine.takeFromSlot(slotIndex);
+        if (!taken) {
+            return;
+        }
+
+        // Add to inventory
+        if (this.inventoryManager.hasRoomFor(taken.itemId)) {
+            this.inventoryManager.addItem(taken.itemId, taken.count);
+
+            // Notify about new item
+            this.game.inventoryPanel.notifyItemAdded();
+
+            // Refresh panels
+            if (this.game.inventoryPanel.isVisible()) {
+                this.game.inventoryPanel.refresh();
+            }
+            if (this.mineInfoPanel.isVisible()) {
+                this.mineInfoPanel.refresh();
+            }
+
+            // Update shop affordability
+            this.game.shopMenu.updateAffordability();
+
+            // Save state
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+        } else {
+            // Put items back if inventory is full
+            mine.outputSlots[slotIndex] = taken;
+            console.warn('Inventory is full, cannot take items from mine');
+        }
+    }
+
+    showFurnaceMenu(furnace) {
+        const screenPos = this.renderer.worldToScreen(furnace.x + 0.5, furnace.y + 0.5);
+
+        this.furnaceInfoPanel.show(
+            furnace,
+            screenPos.x,
+            screenPos.y,
+            (destroyedFurnace) => this.destroyStructure(destroyedFurnace),
+            (clickedFurnace) => this.onFurnaceSmeltSlotClick(clickedFurnace),
+            (clickedFurnace) => this.onFurnaceFuelSlotClick(clickedFurnace),
+            (clickedFurnace) => this.onFurnaceOutputSlotClick(clickedFurnace)
+        );
+    }
+
+    onFurnaceSmeltSlotClick(furnace) {
+        const selectedItem = this.inventoryPanel.getSelectedItem();
+
+        if (!selectedItem) {
+            // No item selected - show dropdown menu
+            this.furnaceInfoPanel.showSmeltDropdown(this.inventoryManager, (selectedItemId) => {
+                this.placeItemInFurnaceSmeltSlot(furnace, selectedItemId);
+            });
+            return;
+        }
+
+        // Item is selected - place it directly
+        this.placeItemInFurnaceSmeltSlot(furnace, selectedItem.itemId);
+    }
+
+    placeItemInFurnaceSmeltSlot(furnace, itemId) {
+        // Place item in smelt slot
+        const result = furnace.placeInSmeltSlot(itemId, 1, this.game.player.maxStackSize);
+
+        // Remove from inventory
+        this.inventoryManager.removeItem(itemId, 1);
+
+        // Handle swapped items
+        if (result && result.swapped) {
+            this.inventoryManager.addItem(result.swapped.itemId, result.swapped.count);
+        }
+
+        // Refresh panels
+        this.inventoryPanel.refresh();
+        if (this.furnaceInfoPanel.isVisible()) {
+            this.furnaceInfoPanel.refresh();
+        }
+
+        // Check if item still exists in inventory
+        const remainingCount = this.inventoryManager.getItemCount(itemId);
+        if (remainingCount === 0) {
+            this.inventoryPanel.clearSelection();
+        }
+
+        // Update shop and save
+        this.game.shopMenu.updateAffordability();
+        this.game.stateManager.scheduleSave(this.game.getGameState());
+    }
+
+    onFurnaceFuelSlotClick(furnace) {
+        const selectedItem = this.inventoryPanel.getSelectedItem();
+
+        if (!selectedItem) {
+            // No item selected - show dropdown menu
+            this.furnaceInfoPanel.showFuelDropdown(this.inventoryManager, (selectedItemId) => {
+                this.placeItemInFurnaceFuelSlot(furnace, selectedItemId);
+            });
+            return;
+        }
+
+        // Item is selected - place it directly
+        this.placeItemInFurnaceFuelSlot(furnace, selectedItem.itemId);
+    }
+
+    placeItemInFurnaceFuelSlot(furnace, itemId) {
+        // Place item in fuel slot
+        const result = furnace.placeInFuelSlot(itemId, 1, this.game.player.maxStackSize);
+
+        // Remove from inventory
+        this.inventoryManager.removeItem(itemId, 1);
+
+        // Handle swapped items
+        if (result && result.swapped) {
+            this.inventoryManager.addItem(result.swapped.itemId, result.swapped.count);
+        }
+
+        // Refresh panels
+        this.inventoryPanel.refresh();
+        if (this.furnaceInfoPanel.isVisible()) {
+            this.furnaceInfoPanel.refresh();
+        }
+
+        // Check if item still exists in inventory
+        const remainingCount = this.inventoryManager.getItemCount(itemId);
+        if (remainingCount === 0) {
+            this.inventoryPanel.clearSelection();
+        }
+
+        // Update shop and save
+        this.game.shopMenu.updateAffordability();
+        this.game.stateManager.scheduleSave(this.game.getGameState());
+    }
+
+    onFurnaceOutputSlotClick(furnace) {
+        const taken = furnace.takeFromOutput();
+        if (!taken) return;
+
+        if (this.inventoryManager.hasRoomFor(taken.itemId)) {
+            this.inventoryManager.addItem(taken.itemId, taken.count);
+            this.game.inventoryPanel.notifyItemAdded();
+
+            if (this.game.inventoryPanel.isVisible()) {
+                this.game.inventoryPanel.refresh();
+            }
+            if (this.furnaceInfoPanel.isVisible()) {
+                this.furnaceInfoPanel.refresh();
+            }
+
+            this.game.shopMenu.updateAffordability();
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+        } else {
+            furnace.outputSlot = taken;
+            console.warn('Inventory is full');
+        }
+    }
+
+    showCrateMenu(crate) {
+        const screenPos = this.renderer.worldToScreen(crate.x + 0.5, crate.y + 0.5);
+
+        this.crateInfoPanel.show(
+            crate,
+            screenPos.x,
+            screenPos.y,
+            (destroyedCrate) => this.destroyStructure(destroyedCrate),
+            (clickedCrate, slotIndex, itemId) => this.onCrateSlotClick(clickedCrate, slotIndex, itemId),
+            this.inventoryManager
+        );
+    }
+
+    onCrateSlotClick(crate, slotIndex, dropdownItemId = null) {
+        // Check if clicking on slot with items (taking out)
+        if (!dropdownItemId && crate.slots[slotIndex]) {
+            // Take items from crate slot
+            const taken = crate.takeFromSlot(slotIndex);
+            if (!taken) return;
+
+            if (this.inventoryManager.hasRoomFor(taken.itemId)) {
+                this.inventoryManager.addItem(taken.itemId, taken.count);
+                this.game.inventoryPanel.notifyItemAdded();
+
+                if (this.game.inventoryPanel.isVisible()) {
+                    this.game.inventoryPanel.refresh();
+                }
+                if (this.crateInfoPanel.isVisible()) {
+                    this.crateInfoPanel.refresh();
+                }
+
+                this.game.shopMenu.updateAffordability();
+                this.game.stateManager.scheduleSave(this.game.getGameState());
+            } else {
+                // Put items back
+                crate.slots[slotIndex] = taken;
+                console.warn('Inventory is full');
+            }
+            return;
+        }
+
+        // Placing items into crate slot (from selection or dropdown)
+        const selectedItem = this.inventoryPanel.getSelectedItem();
+        const itemIdToPlace = dropdownItemId || (selectedItem ? selectedItem.itemId : null);
+
+        if (itemIdToPlace) {
+            // Get count from inventory
+            const count = this.inventoryManager.getItemCount(itemIdToPlace);
+            if (count === 0) return;
+
+            // Place items in crate
+            const result = crate.placeInSlot(slotIndex, itemIdToPlace, count, this.game.player.maxStackSize);
+
+            // Remove from inventory
+            this.inventoryManager.removeItem(itemIdToPlace, count);
+
+            // Handle swapped items
+            if (result && result.swapped) {
+                this.inventoryManager.addItem(result.swapped.itemId, result.swapped.count);
+            }
+
+            // Handle overflow
+            if (result && result.overflow) {
+                this.inventoryManager.addItem(result.overflow.itemId, result.overflow.count);
+            }
+
+            // Clear selection and refresh
+            if (selectedItem) {
+                this.inventoryPanel.clearSelection();
+            }
+            this.inventoryPanel.refresh();
+            if (this.crateInfoPanel.isVisible()) {
+                this.crateInfoPanel.refresh();
+            }
+
+            this.game.shopMenu.updateAffordability();
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+        }
+    }
+
+    showNPCMenu(npc) {
+        const screenPos = this.renderer.worldToScreen(npc.x + 0.5, npc.y + 0.5);
+
+        this.npcInfoPanel.show(
+            npc,
+            screenPos.x,
+            screenPos.y,
+            (clickedNPC) => this.onNPCTakeItem(clickedNPC)
+        );
+    }
+
+    onNPCTakeItem(npc) {
+        const taken = npc.takeItem();
+        if (!taken) return;
+
+        if (this.inventoryManager.hasRoomFor(taken.itemId)) {
+            this.inventoryManager.addItem(taken.itemId, taken.count);
+            this.game.inventoryPanel.notifyItemAdded();
+
+            // Unlock gloves tool (first time collecting output)
+            if (!this.game.player.hasCollectedOutput) {
+                this.game.player.hasCollectedOutput = true;
+                this.game.checkToolUnlocks();
+            }
+
+            // Immediately trigger NPC behavior update to react to missing item
+            if (npc.behavior) {
+                npc.behavior.update(0);
+            }
+
+            if (this.game.inventoryPanel.isVisible()) {
+                this.game.inventoryPanel.refresh();
+            }
+            if (this.npcInfoPanel.isVisible()) {
+                this.npcInfoPanel.refresh();
+            }
+
+            this.game.shopMenu.updateAffordability();
+            this.game.stateManager.scheduleSave(this.game.getGameState());
+        } else {
+            npc.itemSlot = taken;
+            console.warn('Inventory is full');
+        }
+    }
+
+    destroyStructure(structure) {
+        // Remove structure entity
+        this.game.removeEntity(structure);
+
+        // Save state
+        this.game.stateManager.scheduleSave(this.game.getGameState());
+    }
+
     tryPlaceItem(itemId, _slotIndex, tileX, tileY) {
         // Silent version of placeItemOnTile for drag painting
         // Returns true if placement succeeded, false otherwise
@@ -557,17 +903,38 @@ export class WorldInteractionManager {
         }
 
         // Validate item is placeable
-        if (item.itemType !== 'seed' && item.itemType !== 'structure') return false;
+        if (item.itemType !== 'seed' && item.itemType !== 'structure' && item.itemType !== 'npc') return false;
 
-        // Get the tile at this position
-        const tile = this.game.chunkManager.getTile(tileX, tileY);
-        if (!tile || tile.type !== 'grass') return false;
+        // Check for multi-tile entities (like Mine which is 2x2)
+        const width = item.multiTile ? item.multiTile.width : 1;
+        const height = item.multiTile ? item.multiTile.height : 1;
 
-        // Check if there's already an entity at this position
-        const existingEntity = this.game.entities.find(e =>
-            Math.floor(e.x) === tileX && Math.floor(e.y) === tileY
-        );
-        if (existingEntity) return false;
+        // Validate all tiles are grass and not occupied
+        for (let dy = 0; dy < height; dy++) {
+            for (let dx = 0; dx < width; dx++) {
+                const checkX = tileX + dx;
+                const checkY = tileY + dy;
+
+                // Check if tile is grass
+                const tile = this.game.chunkManager.getTile(checkX, checkY);
+                if (!tile || tile.type !== 'grass') return false;
+
+                // Check if there's already an entity at this position
+                const existingEntity = this.game.entities.find(e => {
+                    const ex = Math.floor(e.x);
+                    const ey = Math.floor(e.y);
+                    if (e.width && e.height) {
+                        // Multi-tile entity - check if it overlaps
+                        return checkX >= ex && checkX < ex + e.width &&
+                               checkY >= ey && checkY < ey + e.height;
+                    } else {
+                        // Single-tile entity
+                        return ex === checkX && ey === checkY;
+                    }
+                });
+                if (existingEntity) return false;
+            }
+        }
 
         // Valid placement - create the appropriate entity
         if (item.itemType === 'seed') {
@@ -577,6 +944,16 @@ export class WorldInteractionManager {
                 this.game.createFenceEntity(itemId, tileX, tileY);
             } else if (itemId === 'barrel') {
                 this.game.createBarrelEntity(itemId, tileX, tileY);
+            } else if (itemId === 'mine') {
+                this.game.createMineEntity(itemId, tileX, tileY);
+            } else if (itemId === 'furnace') {
+                this.game.createFurnaceEntity(itemId, tileX, tileY);
+            } else if (itemId === 'crate') {
+                this.game.createCrateEntity(itemId, tileX, tileY);
+            }
+        } else if (item.itemType === 'npc') {
+            if (itemId === 'farmer') {
+                this.game.createFarmerEntity(itemId, tileX, tileY);
             }
         }
 
@@ -709,6 +1086,70 @@ export class WorldInteractionManager {
                 return true;
             }
 
+            // Check for mine with output
+            if (entity.type === 'mine') {
+                // Try to take from any non-empty slot
+                for (let i = 0; i < entity.outputSlots.length; i++) {
+                    if (entity.outputSlots[i]) {
+                        const output = entity.takeFromSlot(i);
+                        if (!output) continue;
+
+                        // Check if inventory has room
+                        if (!this.inventoryManager.hasRoomFor(output.itemId)) {
+                            // Put output back
+                            entity.outputSlots[i] = output;
+                            continue;
+                        }
+
+                        // Add output to inventory
+                        this.inventoryManager.addItem(output.itemId, output.count);
+
+                        // Refresh UI
+                        if (this.inventoryPanel.isVisible()) {
+                            this.inventoryPanel.refresh();
+                        }
+                        this.inventoryPanel.notifyItemAdded();
+                        this.game.shopMenu.updateAffordability();
+                        this.game.stateManager.scheduleSave(this.game.getGameState());
+
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            // Check for NPC with item
+            if (entity.type === 'npc' && entity.itemSlot) {
+                const output = entity.takeItem();
+                if (!output) return false;
+
+                // Check if inventory has room
+                if (!this.inventoryManager.hasRoomFor(output.itemId)) {
+                    // Put output back
+                    entity.itemSlot = output;
+                    return false;
+                }
+
+                // Add output to inventory
+                this.inventoryManager.addItem(output.itemId, output.count);
+
+                // Unlock gloves tool (first time collecting output)
+                if (!this.game.player.hasCollectedOutput) {
+                    this.game.player.hasCollectedOutput = true;
+                    this.game.checkToolUnlocks();
+                }
+
+                // Refresh UI
+                if (this.inventoryPanel.isVisible()) {
+                    this.inventoryPanel.refresh();
+                }
+                this.inventoryPanel.notifyItemAdded();
+                this.game.shopMenu.updateAffordability();
+                this.game.stateManager.scheduleSave(this.game.getGameState());
+
+                return true;
+            }
+
             // Gloves tool doesn't work on anything else
             return false;
         }
@@ -787,9 +1228,9 @@ export class WorldInteractionManager {
             return;
         }
 
-        // Validate item is placeable (seed or structure)
-        if (item.itemType !== 'seed' && item.itemType !== 'structure') {
-            console.warn(`Cannot place ${item.name}: only seeds and structures can be placed`);
+        // Validate item is placeable (seed, structure, or npc)
+        if (item.itemType !== 'seed' && item.itemType !== 'structure' && item.itemType !== 'npc') {
+            console.warn(`Cannot place ${item.name}: only seeds, structures, and NPCs can be placed`);
             this.inventoryPanel.clearSelection();
             return;
         }
@@ -798,30 +1239,51 @@ export class WorldInteractionManager {
         tileX = Math.floor(tileX);
         tileY = Math.floor(tileY);
 
-        // Get the tile at this position
-        const tile = this.game.chunkManager.getTile(tileX, tileY);
-        if (!tile) {
-            console.warn('Cannot place item: tile not found');
-            this.inventoryPanel.clearSelection();
-            return;
-        }
+        // Check for multi-tile entities (like Mine which is 2x2)
+        const width = item.multiTile ? item.multiTile.width : 1;
+        const height = item.multiTile ? item.multiTile.height : 1;
 
-        // Check if tile is grass
-        if (tile.type !== 'grass') {
-            console.warn('Cannot place item: can only place on grass tiles');
-            this.inventoryPanel.clearSelection();
-            return;
-        }
+        // Validate all tiles are grass and not occupied
+        for (let dy = 0; dy < height; dy++) {
+            for (let dx = 0; dx < width; dx++) {
+                const checkX = tileX + dx;
+                const checkY = tileY + dy;
 
-        // Check if there's already an entity at this position
-        const existingEntity = this.game.entities.find(e =>
-            Math.floor(e.x) === tileX && Math.floor(e.y) === tileY
-        );
+                // Check if tile exists
+                const tile = this.game.chunkManager.getTile(checkX, checkY);
+                if (!tile) {
+                    console.warn('Cannot place item: tile not found');
+                    this.inventoryPanel.clearSelection();
+                    return;
+                }
 
-        if (existingEntity) {
-            console.warn('Cannot place item: tile is already occupied');
-            this.inventoryPanel.clearSelection();
-            return;
+                // Check if tile is grass
+                if (tile.type !== 'grass') {
+                    console.warn('Cannot place item: can only place on grass tiles');
+                    this.inventoryPanel.clearSelection();
+                    return;
+                }
+
+                // Check if there's already an entity at this position
+                const existingEntity = this.game.entities.find(e => {
+                    const ex = Math.floor(e.x);
+                    const ey = Math.floor(e.y);
+                    if (e.width && e.height) {
+                        // Multi-tile entity - check if it overlaps
+                        return checkX >= ex && checkX < ex + e.width &&
+                               checkY >= ey && checkY < ey + e.height;
+                    } else {
+                        // Single-tile entity
+                        return ex === checkX && ey === checkY;
+                    }
+                });
+
+                if (existingEntity) {
+                    console.warn('Cannot place item: tile is already occupied');
+                    this.inventoryPanel.clearSelection();
+                    return;
+                }
+            }
         }
 
         // Valid placement - create the appropriate entity
@@ -832,6 +1294,16 @@ export class WorldInteractionManager {
                 this.game.createFenceEntity(itemId, tileX, tileY);
             } else if (itemId === 'barrel') {
                 this.game.createBarrelEntity(itemId, tileX, tileY);
+            } else if (itemId === 'mine') {
+                this.game.createMineEntity(itemId, tileX, tileY);
+            } else if (itemId === 'furnace') {
+                this.game.createFurnaceEntity(itemId, tileX, tileY);
+            } else if (itemId === 'crate') {
+                this.game.createCrateEntity(itemId, tileX, tileY);
+            }
+        } else if (item.itemType === 'npc') {
+            if (itemId === 'farmer') {
+                this.game.createFarmerEntity(itemId, tileX, tileY);
             }
         }
 
@@ -989,15 +1461,36 @@ export class WorldInteractionManager {
         const tileX = Math.floor(worldPos.x);
         const tileY = Math.floor(worldPos.y);
 
-        // Check if this is a valid placement location
-        const tile = this.game.chunkManager.getTile(tileX, tileY);
-        if (!tile || tile.type !== 'grass') return;
+        // Get multi-tile dimensions if applicable
+        const width = item.multiTile ? item.multiTile.width : 1;
+        const height = item.multiTile ? item.multiTile.height : 1;
 
-        // Check if tile is already occupied
-        const existingEntity = this.game.entities.find(e =>
-            Math.floor(e.x) === tileX && Math.floor(e.y) === tileY
-        );
-        if (existingEntity) return;
+        // Check if all tiles in the area are valid for placement
+        let allValid = true;
+        for (let dy = 0; dy < height; dy++) {
+            for (let dx = 0; dx < width; dx++) {
+                const checkX = tileX + dx;
+                const checkY = tileY + dy;
+
+                const tile = this.game.chunkManager.getTile(checkX, checkY);
+                if (!tile || tile.type !== 'grass') {
+                    allValid = false;
+                    break;
+                }
+
+                // Check if tile is already occupied
+                const existingEntity = this.game.entities.find(e =>
+                    Math.floor(e.x) === checkX && Math.floor(e.y) === checkY
+                );
+                if (existingEntity) {
+                    allValid = false;
+                    break;
+                }
+            }
+            if (!allValid) break;
+        }
+
+        if (!allValid) return;
 
         // Calculate screen position (ctx is already scaled by zoom)
         const camera = this.renderer.getCamera();
@@ -1016,8 +1509,8 @@ export class WorldInteractionManager {
                     image,
                     screenX,
                     screenY,
-                    tileSize,
-                    tileSize
+                    tileSize * width,
+                    tileSize * height
                 );
             }
         } else {
@@ -1028,10 +1521,12 @@ export class WorldInteractionManager {
             ctx.font = `${fontSize}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+
+            // For multi-tile structures, center the emoji in the full area
             ctx.fillText(
                 item.emoji,
-                screenX + (tileSize / 2),
-                screenY + (tileSize / 2)
+                screenX + (tileSize * width / 2),
+                screenY + (tileSize * height / 2)
             );
         }
 

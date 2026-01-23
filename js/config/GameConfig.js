@@ -66,6 +66,32 @@ export const GameConfig = {
             }
         }
     },
+    MINING: {
+        // Configuration for mine output generation
+        // Each mine click can generate multiple items based on occurrence chance
+        // Priority order: rock > ore > coal (if slots are limited)
+        MAX_STACK_SIZE: 5,
+        OUTPUTS: [
+            { itemId: 'rock', chance: 0.6 },   // 60% chance
+            { itemId: 'ore', chance: 0.3 },    // 30% chance
+            { itemId: 'coal', chance: 0.5 }    // 50% chance
+        ]
+    },
+    SMELTING: {
+        // Smelting recipes: smeltable item -> output item
+        RECIPES: {
+            'rock': {
+                output: 'brick',
+                time: 30  // Smelting time in seconds
+            },
+            'ore': {
+                output: 'iron',
+                time: 60  // Smelting time in seconds
+            }
+        },
+        // Fuel items that can be used in furnaces
+        FUEL_ITEMS: ['coal']
+    },
     STORAGE: {
         SAVE_KEY: 'clickerFarmGameState',
         AUTO_SAVE_INTERVAL: 30000, // 30 seconds
