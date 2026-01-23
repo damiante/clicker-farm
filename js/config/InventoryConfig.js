@@ -6,10 +6,10 @@ export const InventoryConfig = {
 
     // Pricing formulas (exponential growth)
     // price = base * (growth ^ slotsOwned)
-    SLOT_BASE_PRICE: 500,
+    SLOT_BASE_PRICE: 50,
     SLOT_PRICE_GROWTH: 1.5,
 
-    STACK_BASE_PRICE: 25,
+    STACK_BASE_PRICE: 1000,
     STACK_PRICE_GROWTH: 1.7,
 
     STACK_SIZE_INCREMENT: 5
