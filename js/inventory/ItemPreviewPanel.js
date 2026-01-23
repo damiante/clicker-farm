@@ -122,7 +122,10 @@ export class ItemPreviewPanel {
 
     hide() {
         this.panel.classList.add('hidden');
+        this.panel.innerHTML = ''; // Clear content to remove button elements
         this.visible = false;
+        this.onSellCallback = null; // Clear callbacks
+        this.onSellAllCallback = null;
     }
 
     isVisible() {

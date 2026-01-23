@@ -343,7 +343,27 @@ export class ShopMenu {
                 if (item.itemType === 'tool') {
                     if (this.game.player.ownedTools && this.game.player.ownedTools.includes(item.id)) {
                         itemElement.classList.add('disabled');
+
+                        // Update visual indicators for owned tool
+                        const priceElement = itemElement.querySelector('.item-price');
+                        const nameElement = itemElement.querySelector('.item-name');
+                        if (priceElement) {
+                            priceElement.textContent = '✅';
+                        }
+                        if (nameElement) {
+                            nameElement.style.textDecoration = 'line-through';
+                        }
                         return;
+                    } else {
+                        // Tool not owned - ensure normal display
+                        const priceElement = itemElement.querySelector('.item-price');
+                        const nameElement = itemElement.querySelector('.item-name');
+                        if (priceElement && priceElement.textContent === '✅') {
+                            priceElement.textContent = `$${item.salePrice}`;
+                        }
+                        if (nameElement) {
+                            nameElement.style.textDecoration = 'none';
+                        }
                     }
                 }
 

@@ -198,7 +198,7 @@
     "name": "Rice Seed",
     "emoji": "🫘",
     "description": "Plant to grow rice",
-    "salePrice": 50.00,
+    "salePrice": 25.00,
     "itemType": "seed",
     "growsInto": "rice",
     "sproutTime": 80,
@@ -211,7 +211,7 @@
     "name": "Rice",
     "emoji": "🌾",
     "description": "Golden rice stalks",
-    "salePrice": 50.00,
+    "salePrice": 30.00,
     "itemType": "plant",
     "plantType": "grain",
     "overworldScale": 0.5
@@ -221,7 +221,7 @@
     "name": "Sake",
     "emoji": "🍶",
     "description": "Fermented rice wine",
-    "salePrice": 100.00,
+    "salePrice": 40.00,
     "itemType": "resource",
     "overworldScale": 0.7
   },
@@ -230,7 +230,7 @@
     "name": "Wheat Seed",
     "emoji": "🫘",
     "description": "Plant to grow wheat",
-    "salePrice": 60.00,
+    "salePrice": 45.00,
     "itemType": "seed",
     "growsInto": "wheat",
     "sproutTime": 80,
@@ -243,7 +243,7 @@
     "name": "Wheat",
     "emoji": "🌾",
     "description": "Amber waves of grain",
-    "salePrice": 60.00,
+    "salePrice": 50.00,
     "itemType": "plant",
     "plantType": "grain",
     "overworldScale": 0.5
@@ -253,7 +253,7 @@
     "name": "Beer",
     "emoji": "🍺",
     "description": "Fermented wheat beverage",
-    "salePrice": 125.00,
+    "salePrice": 75.00,
     "itemType": "resource",
     "overworldScale": 0.7
   },
@@ -262,7 +262,7 @@
     "name": "Grape Seed",
     "emoji": "🫘",
     "description": "Plant to grow a grapevine",
-    "salePrice": 100.00,
+    "salePrice": 300.00,
     "itemType": "seed",
     "growsInto": "grape_vine",
     "sproutTime": 200,
@@ -294,7 +294,7 @@
     "name": "Wine",
     "emoji": "🍷",
     "description": "Fermented grape wine",
-    "salePrice": 250.00,
+    "salePrice": 75.00,
     "itemType": "resource",
     "overworldScale": 0.7
   }

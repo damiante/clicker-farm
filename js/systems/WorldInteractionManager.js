@@ -434,15 +434,130 @@ export class WorldInteractionManager {
         const item = this.itemRegistry.getItem(itemId);
         if (!item) return false;
 
-        // Validate item is placeable
-        if (item.itemType !== 'seed' && item.itemType !== 'structure') return false;
-
         // Check if player has this item in inventory
         if (this.inventoryManager.getItemCount(itemId) === 0) return false;
 
         // Ensure tile coordinates are integers
         tileX = Math.floor(tileX);
         tileY = Math.floor(tileY);
+
+        // Check if gloves are owned - allows painting items into barrel input slots
+        const hasGloves = this.game.player.ownedTools && this.game.player.ownedTools.includes('gloves');
+
+        if (hasGloves) {
+            // Check for barrel at this position
+            const entity = this.game.entities.find(e =>
+                Math.floor(e.x) === tileX && Math.floor(e.y) === tileY
+            );
+
+            if (entity && entity.type === 'barrel') {
+                const barrel = entity;
+
+                // Check if this item can be fermented
+                const recipe = GameConfig.FERMENTATION.RECIPES[itemId];
+                if (!recipe) return false; // Not a fermentable item
+
+                const maxStackSize = this.game.player.maxStackSize;
+
+                // If barrel has a different item type in input, can't add
+                if (barrel.inputSlot && barrel.inputSlot.itemId !== itemId) {
+                    return false;
+                }
+
+                // Calculate how many items we can add
+                const currentCount = barrel.inputSlot ? barrel.inputSlot.count : 0;
+                const capacity = maxStackSize - currentCount;
+
+                if (capacity <= 0) {
+                    return false; // Barrel input is full
+                }
+
+                // Add one item to barrel input slot
+                if (!barrel.inputSlot) {
+                    barrel.inputSlot = { itemId, count: 1 };
+                } else {
+                    barrel.inputSlot.count += 1;
+                }
+
+                // Update barrel's max stack size
+                barrel.maxStackSize = maxStackSize;
+
+                // Start fermentation if not already fermenting
+                if (!barrel.isFermenting()) {
+                    barrel.startFermentation(recipe.output, recipe.time);
+                }
+
+                // Remove item from inventory
+                this.inventoryManager.removeItem(itemId, 1);
+
+                // Refresh inventory panel
+                this.inventoryPanel.refresh();
+
+                // Check if there are still items of this type for selection persistence
+                const remainingCount = this.inventoryManager.getItemCount(itemId);
+                if (remainingCount === 0) {
+                    // No more items of this type, clear selection
+                    this.inventoryPanel.clearSelection();
+                } else {
+                    // Find the first slot with this itemId
+                    const newSlotIndex = this.inventoryManager.slots.findIndex(s => s && s.itemId === itemId);
+                    if (newSlotIndex !== -1) {
+                        // Update selection to the new slot
+                        this.inventoryPanel.selectedSlotIndex = newSlotIndex;
+                        const slot = this.inventoryManager.slots[newSlotIndex];
+
+                        const onSell = () => {
+                            const item = this.itemRegistry.getItem(slot.itemId);
+                            if (item && item.salePrice > 0) {
+                                this.inventoryManager.removeItem(slot.itemId, 1);
+                                this.game.addMoney(item.salePrice);
+
+                                const remainingCount = this.inventoryManager.getItemCount(slot.itemId);
+                                if (remainingCount === 0) {
+                                    this.inventoryPanel.clearSelection();
+                                } else {
+                                    this.inventoryPanel.refresh();
+                                    this.inventoryPanel.previewPanel.show(slot.itemId, onSell, onSellAll);
+                                }
+                            }
+                        };
+
+                        const onSellAll = () => {
+                            const item = this.itemRegistry.getItem(slot.itemId);
+                            if (item && item.salePrice > 0) {
+                                const totalCount = this.inventoryManager.getItemCount(slot.itemId);
+                                const totalValue = totalCount * item.salePrice;
+                                this.inventoryManager.removeItem(slot.itemId, totalCount);
+                                this.game.addMoney(totalValue);
+                                this.inventoryPanel.clearSelection();
+                                this.inventoryPanel.refresh();
+                            }
+                        };
+
+                        this.inventoryPanel.previewPanel.show(slot.itemId, onSell, onSellAll);
+                    } else {
+                        // Shouldn't happen, but clear selection just in case
+                        this.inventoryPanel.clearSelection();
+                    }
+                }
+
+                // Refresh barrel panel if visible
+                if (this.barrelInfoPanel.isVisible()) {
+                    this.barrelInfoPanel.refresh();
+                }
+
+                // Update shop affordability
+                this.game.shopMenu.updateAffordability();
+
+                // Save state
+                this.game.stateManager.scheduleSave(this.game.getGameState());
+
+                return true;
+            }
+        }
+
+        // Validate item is placeable
+        if (item.itemType !== 'seed' && item.itemType !== 'structure') return false;
 
         // Get the tile at this position
         const tile = this.game.chunkManager.getTile(tileX, tileY);

@@ -54,6 +54,7 @@ body {
     padding-right: 5px;
     scrollbar-width: thin;
     scrollbar-color: rgba(74, 144, 226, 0.5) rgba(44, 62, 80, 0.3);
+    z-index: 20;
 }
 
 #top-left::-webkit-scrollbar {
