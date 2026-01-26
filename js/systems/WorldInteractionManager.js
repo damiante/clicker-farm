@@ -1176,18 +1176,48 @@ export class WorldInteractionManager {
         console.log(`[Painting] placeItemInSlot returned: ${success}`);
 
         if (success) {
-            // Remove one item from inventory
-            this.inventoryManager.removeItem(selectedItem.itemId, 1);
+            const paintedItemId = selectedItem.itemId;
+            const originalSlotIndex = selectedItem.slotIndex;
 
-            // Check if that was the last item of this type and clear selection if so
-            const remainingCount = this.inventoryManager.getItemCount(selectedItem.itemId);
-            if (remainingCount === 0) {
+            // Remove one item from inventory
+            this.inventoryManager.removeItem(paintedItemId, 1);
+
+            // Check if the originally selected slot is now empty
+            const currentSlot = this.inventoryManager.getSlot(originalSlotIndex);
+            const remainingCount = this.inventoryManager.getItemCount(paintedItemId);
+
+            if (!currentSlot && remainingCount > 0) {
+                // Slot emptied but more items exist - auto-select next stack to continue painting
+                for (let i = 0; i < this.inventoryManager.slots.length; i++) {
+                    const slot = this.inventoryManager.getSlot(i);
+                    if (slot && slot.itemId === paintedItemId) {
+                        this.inventoryPanel.selectedSlotIndex = i;
+                        break;
+                    }
+                }
+            } else if (remainingCount === 0) {
+                // No more items of this type - clear selection
                 this.inventoryPanel.clearSelection();
             }
 
             // Refresh inventory panel if visible
             if (this.inventoryPanel.isVisible()) {
                 this.inventoryPanel.refresh();
+            }
+
+            // Refresh preview panel if it's showing the painted item (updates "Sell all" count)
+            if (this.inventoryPanel.previewPanel && this.inventoryPanel.previewPanel.isVisible()) {
+                const newSelectedItem = this.inventoryPanel.getSelectedItem();
+                if (newSelectedItem && newSelectedItem.itemId === paintedItemId) {
+                    // Hide and re-show to trigger full refresh with updated counts
+                    this.inventoryPanel.previewPanel.hide();
+
+                    // Trigger slot click to re-show preview with correct callbacks
+                    const slotElement = document.querySelector(`.inventory-slot[data-slot-index="${this.inventoryPanel.selectedSlotIndex}"]`);
+                    if (slotElement) {
+                        slotElement.click();
+                    }
+                }
             }
 
             // Update shop affordability
