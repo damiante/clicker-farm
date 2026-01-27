@@ -838,8 +838,15 @@ export class WorldInteractionManager {
             npc,
             screenPos.x,
             screenPos.y,
-            (clickedNPC) => this.onNPCTakeItem(clickedNPC)
+            (clickedNPC) => this.onNPCTakeItem(clickedNPC),
+            (clickedNPC) => this.onNPCFire(clickedNPC)
         );
+    }
+
+    onNPCFire(npc) {
+        // Remove the NPC from the game
+        this.game.removeEntity(npc);
+        this.npcInfoPanel.hide();
     }
 
     onNPCTakeItem(npc) {

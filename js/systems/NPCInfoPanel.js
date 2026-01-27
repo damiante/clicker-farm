@@ -10,6 +10,7 @@ export class NPCInfoPanel {
         this.visible = false;
         this.currentNPC = null;
         this.onTakeItemCallback = null;
+        this.onFireCallback = null;
 
         // Component instances
         this.itemSlot = null;
@@ -32,9 +33,10 @@ export class NPCInfoPanel {
         });
     }
 
-    show(npc, screenX, screenY, onTakeItem) {
+    show(npc, screenX, screenY, onTakeItem, onFire) {
         this.currentNPC = npc;
         this.onTakeItemCallback = onTakeItem;
+        this.onFireCallback = onFire;
 
         const item = this.itemRegistry.getItem(npc.itemId);
         if (!item) {
@@ -123,6 +125,17 @@ export class NPCInfoPanel {
 
             this.panel.appendChild(takeBtn.getElement());
         }
+
+        // Fire button
+        const fireBtn = new Button('Fire', '🔥', () => {
+            if (this.onFireCallback) {
+                this.onFireCallback(npc);
+                this.hide();
+            }
+        }, 'secondary');
+        fireBtn.getElement().style.width = UIComponentTheme.PANEL.BUTTON.WIDTH;
+
+        this.panel.appendChild(fireBtn.getElement());
     }
 
     refresh() {
